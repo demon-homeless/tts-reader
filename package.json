@@ -28,66 +28,66 @@
   "contributes": {
     "commands": [
       {
-        "command": "edgeTts.readSelection",
+        "command": "ttsReader.readSelection",
         "title": "%command.readSelection.title%"
       },
       {
-        "command": "edgeTts.readFile",
+        "command": "ttsReader.readFile",
         "title": "%command.readFile.title%"
       },
       {
-        "command": "edgeTts.readClipboard",
+        "command": "ttsReader.readClipboard",
         "title": "%command.readClipboard.title%"
       },
       {
-        "command": "edgeTts.stop",
+        "command": "ttsReader.stop",
         "title": "%command.stop.title%"
       },
       {
-        "command": "edgeTts.pause",
+        "command": "ttsReader.pause",
         "title": "%command.pause.title%"
       },
       {
-        "command": "edgeTts.skipNext",
+        "command": "ttsReader.skipNext",
         "title": "%command.skipNext.title%"
       },
       {
-        "command": "edgeTts.listVoices",
+        "command": "ttsReader.listVoices",
         "title": "%command.listVoices.title%"
       },
       {
-        "command": "edgeTts.cleanupTemp",
+        "command": "ttsReader.cleanupTemp",
         "title": "%command.cleanupTemp.title%"
       },
       {
-        "command": "edgeTts.resume",
+        "command": "ttsReader.resume",
         "title": "%command.resume.title%"
       },
       {
-        "command": "edgeTts.readFromCursor",
+        "command": "ttsReader.readFromCursor",
         "title": "%command.readFromCursor.title%"
       }
     ],
     "menus": {
       "editor/context": [
         {
-          "command": "edgeTts.readSelection",
+          "command": "ttsReader.readSelection",
           "when": "editorHasSelection",
           "group": "navigation@10"
         },
         {
-          "command": "edgeTts.readFromCursor",
+          "command": "ttsReader.readFromCursor",
           "when": "editorTextFocus && !editorHasSelection",
           "group": "navigation@11"
         },
         {
-          "command": "edgeTts.pause",
-          "when": "edgeTts.isPaused",
+          "command": "ttsReader.pause",
+          "when": "ttsReader.isPaused",
           "group": "navigation@20"
         },
         {
-          "command": "edgeTts.stop",
-          "when": "edgeTts.isPlaying",
+          "command": "ttsReader.stop",
+          "when": "ttsReader.isPlaying",
           "group": "navigation@21"
         }
       ]
@@ -95,7 +95,7 @@
     "configuration": {
       "title": "%config.title%",
       "properties": {
-        "edgeTts.provider": {
+        "ttsReader.provider": {
           "type": "string",
           "enum": [
             "edge-tts",
@@ -106,41 +106,41 @@
           "default": "edge-tts",
           "description": "%config.provider.description%"
         },
-        "edgeTts.voice": {
+        "ttsReader.voice": {
           "type": "string",
           "default": "en-US-AvaMultilingualNeural",
           "description": "%config.voice.description%"
         },
-        "edgeTts.rate": {
+        "ttsReader.rate": {
           "type": "string",
           "default": "+0%",
           "description": "%config.rate.description%"
         },
-        "edgeTts.volume": {
+        "ttsReader.volume": {
           "type": "string",
           "default": "+0%",
           "description": "%config.volume.description%"
         },
-        "edgeTts.pitch": {
+        "ttsReader.pitch": {
           "type": "string",
           "default": "+0Hz",
           "description": "%config.pitch.description%"
         },
-        "edgeTts.maxSegmentChars": {
+        "ttsReader.maxSegmentChars": {
           "type": "number",
           "default": 180,
           "minimum": 40,
           "maximum": 1000,
           "description": "%config.maxSegmentChars.description%"
         },
-        "edgeTts.minSegmentChars": {
+        "ttsReader.minSegmentChars": {
           "type": "number",
           "default": 20,
           "minimum": 1,
           "maximum": 200,
           "description": "%config.minSegmentChars.description%"
         },
-        "edgeTts.segmentMode": {
+        "ttsReader.segmentMode": {
           "type": "string",
           "enum": [
             "smart",
@@ -150,41 +150,41 @@
           "default": "smart",
           "description": "%config.segmentMode.description%"
         },
-        "edgeTts.preloadSegments": {
+        "ttsReader.preloadSegments": {
           "type": "number",
           "default": 2,
           "minimum": 0,
           "maximum": 10,
           "description": "%config.preloadSegments.description%"
         },
-        "edgeTts.playbackRate": {
+        "ttsReader.playbackRate": {
           "type": "number",
           "default": 1,
           "minimum": 0.5,
           "maximum": 3,
           "description": "%config.playbackRate.description%"
         },
-        "edgeTts.proxyUrl": {
+        "ttsReader.proxyUrl": {
           "type": "string",
           "default": "",
           "description": "%config.proxyUrl.description%"
         },
-        "edgeTts.apiUrl": {
+        "ttsReader.apiUrl": {
           "type": "string",
           "default": "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1",
           "description": "%config.apiUrl.description%"
         },
-        "edgeTts.apiKey": {
+        "ttsReader.apiKey": {
           "type": "string",
           "default": "",
           "description": "%config.apiKey.description%"
         },
-        "edgeTts.model": {
+        "ttsReader.model": {
           "type": "string",
           "default": "",
           "description": "%config.model.description%"
         },
-        "edgeTts.trustedClientToken": {
+        "ttsReader.trustedClientToken": {
           "type": "string",
           "default": "6A5AA1D4EAFF4E9FB37E23D68491D6F4",
           "description": "%config.trustedClientToken.description%"

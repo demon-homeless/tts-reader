@@ -30,7 +30,7 @@ function getConfig(): {
   model: string;
   trustedClientToken: string;
 } {
-  const cfg = vscode.workspace.getConfiguration("edgeTts");
+  const cfg = vscode.workspace.getConfiguration("ttsReader");
   return {
     provider: cfg.get<TtsProvider>("provider", "edge-tts"),
     voice: cfg.get<string>("voice", "en-US-AvaMultilingualNeural"),
@@ -75,9 +75,9 @@ const sbPlay = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left,
 const sbPause = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 98);
 const sbStop = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 97);
 
-sbPlay.command = "edgeTts.resume";
-sbPause.command = "edgeTts.pause";
-sbStop.command = "edgeTts.stop";
+sbPlay.command = "ttsReader.resume";
+sbPause.command = "ttsReader.pause";
+sbStop.command = "ttsReader.stop";
 
 function showStatusItems(state: PlayerState) {
   sbMain.show();
@@ -99,8 +99,8 @@ function showStatusItems(state: PlayerState) {
 
 function updateStatusBar(state: PlayerState, current: number, total: number) {
   // Update context keys for dynamic menu visibility
-  void vscode.commands.executeCommand("setContext", "edgeTts.isPlaying", state === "playing");
-  void vscode.commands.executeCommand("setContext", "edgeTts.isPaused", state === "paused");
+  void vscode.commands.executeCommand("setContext", "ttsReader.isPlaying", state === "playing");
+  void vscode.commands.executeCommand("setContext", "ttsReader.isPaused", state === "paused");
 
   switch (state) {
     case "idle":
@@ -210,7 +210,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Read selection (or whole file if no selection)
   context.subscriptions.push(
-    vscode.commands.registerCommand("edgeTts.readSelection", () => {
+    vscode.commands.registerCommand("ttsReader.readSelection", () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
         vscode.window.showWarningMessage(t("msg.noActiveEditor"));
@@ -229,7 +229,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Read entire current file
   context.subscriptions.push(
-    vscode.commands.registerCommand("edgeTts.readFile", async () => {
+    vscode.commands.registerCommand("ttsReader.readFile", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
         vscode.window.showWarningMessage(t("msg.noActiveEditor"));
@@ -242,7 +242,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Read clipboard
   context.subscriptions.push(
-    vscode.commands.registerCommand("edgeTts.readClipboard", async () => {
+    vscode.commands.registerCommand("ttsReader.readClipboard", async () => {
       const text = await vscode.env.clipboard.readText();
       startReading(text, "clipboard");
     })
@@ -250,21 +250,21 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Stop
   context.subscriptions.push(
-    vscode.commands.registerCommand("edgeTts.stop", () => {
+    vscode.commands.registerCommand("ttsReader.stop", () => {
       if (engine) engine.stop();
     })
   );
 
   // Pause / resume
   context.subscriptions.push(
-    vscode.commands.registerCommand("edgeTts.pause", () => {
+    vscode.commands.registerCommand("ttsReader.pause", () => {
       if (engine) engine.pause();
     })
   );
 
   // Resume (explicit, for right-click menu)
   context.subscriptions.push(
-    vscode.commands.registerCommand("edgeTts.resume", () => {
+    vscode.commands.registerCommand("ttsReader.resume", () => {
       if (engine && engine.getState() === "paused") {
         engine.pause(); // pause() toggles: paused -> playing
       }
@@ -273,7 +273,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Read from the cursor's current line to end of file
   context.subscriptions.push(
-    vscode.commands.registerCommand("edgeTts.readFromCursor", async () => {
+    vscode.commands.registerCommand("ttsReader.readFromCursor", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
         vscode.window.showWarningMessage(t("msg.noActiveEditor"));
@@ -293,21 +293,21 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Skip to next segment
   context.subscriptions.push(
-    vscode.commands.registerCommand("edgeTts.skipNext", () => {
+    vscode.commands.registerCommand("ttsReader.skipNext", () => {
       if (engine) engine.skip();
     })
   );
 
   // List voices (fetch from Edge TTS or show a curated list)
   context.subscriptions.push(
-    vscode.commands.registerCommand("edgeTts.listVoices", () => {
+    vscode.commands.registerCommand("ttsReader.listVoices", () => {
       showVoiceList();
     })
   );
 
   // Clean up temp audio files
   context.subscriptions.push(
-    vscode.commands.registerCommand("edgeTts.cleanupTemp", () => {
+    vscode.commands.registerCommand("ttsReader.cleanupTemp", () => {
       if (engine) {
         const removed = engine.cleanupTempFiles();
         vscode.window.showInformationMessage(
@@ -322,7 +322,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Update status bar on config change
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("edgeTts")) {
+      if (e.affectsConfiguration("ttsReader")) {
         const c = getConfig();
         if (engine) {
           engine.setPlaybackRate(c.playbackRate);
@@ -384,7 +384,7 @@ async function showVoiceList() {
     const voiceName =
       typeof selected === "string" ? selected : (selected as any).label;
     await vscode.workspace
-      .getConfiguration("edgeTts")
+      .getConfiguration("ttsReader")
       .update("voice", voiceName, vscode.ConfigurationTarget.Global);
     vscode.window.showInformationMessage(t("msg.voiceSet", { voice: voiceName }));
   }
