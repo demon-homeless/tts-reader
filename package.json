@@ -1,0 +1,210 @@
+{
+  "name": "sub-life-tts-reader",
+  "displayName": "TTS Reader",
+  "icon": "icon.png",
+  "description": "%extension.description%",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "author": {
+    "name": "Demon",
+    "email": "demon-homeless@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@git.lan:8022/demon/TTS-Reader.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/vscode/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ttsReader.readSelection",
+        "title": "%command.readSelection.title%"
+      },
+      {
+        "command": "ttsReader.readFile",
+        "title": "%command.readFile.title%"
+      },
+      {
+        "command": "ttsReader.readClipboard",
+        "title": "%command.readClipboard.title%"
+      },
+      {
+        "command": "ttsReader.stop",
+        "title": "%command.stop.title%"
+      },
+      {
+        "command": "ttsReader.pause",
+        "title": "%command.pause.title%"
+      },
+      {
+        "command": "ttsReader.skipNext",
+        "title": "%command.skipNext.title%"
+      },
+      {
+        "command": "ttsReader.listVoices",
+        "title": "%command.listVoices.title%"
+      },
+      {
+        "command": "ttsReader.cleanupTemp",
+        "title": "%command.cleanupTemp.title%"
+      },
+      {
+        "command": "ttsReader.resume",
+        "title": "%command.resume.title%"
+      },
+      {
+        "command": "ttsReader.readFromCursor",
+        "title": "%command.readFromCursor.title%"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "ttsReader.readSelection",
+          "when": "editorHasSelection",
+          "group": "navigation@10"
+        },
+        {
+          "command": "ttsReader.readFromCursor",
+          "when": "editorTextFocus && !editorHasSelection",
+          "group": "navigation@11"
+        },
+        {
+          "command": "ttsReader.pause",
+          "when": "ttsReader.isPaused",
+          "group": "navigation@20"
+        },
+        {
+          "command": "ttsReader.stop",
+          "when": "ttsReader.isPlaying",
+          "group": "navigation@21"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "%config.title%",
+      "properties": {
+        "ttsReader.provider": {
+          "type": "string",
+          "enum": [
+            "edge-tts",
+            "openai",
+            "google",
+            "custom"
+          ],
+          "default": "edge-tts",
+          "description": "%config.provider.description%"
+        },
+        "ttsReader.voice": {
+          "type": "string",
+          "default": "en-US-AvaMultilingualNeural",
+          "description": "%config.voice.description%"
+        },
+        "ttsReader.rate": {
+          "type": "string",
+          "default": "+0%",
+          "description": "%config.rate.description%"
+        },
+        "ttsReader.volume": {
+          "type": "string",
+          "default": "+0%",
+          "description": "%config.volume.description%"
+        },
+        "ttsReader.pitch": {
+          "type": "string",
+          "default": "+0Hz",
+          "description": "%config.pitch.description%"
+        },
+        "ttsReader.maxSegmentChars": {
+          "type": "number",
+          "default": 180,
+          "minimum": 40,
+          "maximum": 1000,
+          "description": "%config.maxSegmentChars.description%"
+        },
+        "ttsReader.minSegmentChars": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "%config.minSegmentChars.description%"
+        },
+        "ttsReader.segmentMode": {
+          "type": "string",
+          "enum": [
+            "smart",
+            "sentence",
+            "paragraph"
+          ],
+          "default": "smart",
+          "description": "%config.segmentMode.description%"
+        },
+        "ttsReader.preloadSegments": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 10,
+          "description": "%config.preloadSegments.description%"
+        },
+        "ttsReader.playbackRate": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0.5,
+          "maximum": 3,
+          "description": "%config.playbackRate.description%"
+        },
+        "ttsReader.proxyUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.proxyUrl.description%"
+        },
+        "ttsReader.apiUrl": {
+          "type": "string",
+          "default": "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1",
+          "description": "%config.apiUrl.description%"
+        },
+        "ttsReader.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "%config.apiKey.description%"
+        },
+        "ttsReader.model": {
+          "type": "string",
+          "default": "",
+          "description": "%config.model.description%"
+        },
+        "ttsReader.trustedClientToken": {
+          "type": "string",
+          "default": "6A5AA1D4EAFF4E9FB37E23D68491D6F4",
+          "description": "%config.trustedClientToken.description%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./ && npm run copy-chrome",
+    "copy-chrome": "node -e \"const fs=require('fs'),p=require('path');function cp(s,d){fs.mkdirSync(d,{recursive:true});for(const f of fs.readdirSync(s)){const sp=p.join(s,f),dp=p.join(d,f);if(fs.statSync(sp).isDirectory())cp(sp,dp);else fs.copyFileSync(sp,dp)}}cp('src/chrome','out/chrome');console.log('Chrome assets copied to out/chrome/')\"",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
+  }
+}

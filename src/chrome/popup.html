@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TTS Reader</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 340px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      color: #1a1a2e;
+      background: #f8f9fa;
+    }
+    .header {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: white;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 { font-size: 15px; font-weight: 600; }
+    .header .provider-badge {
+      font-size: 10px;
+      background: rgba(255,255,255,0.2);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .status-bar {
+      padding: 8px 16px;
+      font-size: 12px;
+      color: #6b7280;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #9ca3af;
+    }
+    .status-dot.playing { background: #10b981; animation: pulse 1.5s infinite; }
+    .status-dot.paused { background: #f59e0b; }
+    .status-dot.synthesizing { background: #3b82f6; animation: pulse 0.8s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+    .progress-bar { height: 3px; background: #e5e7eb; }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4f46e5, #7c3aed);
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    .hint {
+      padding: 10px 16px;
+      font-size: 11px;
+      color: #9ca3af;
+      border-bottom: 1px solid #e5e7eb;
+      line-height: 1.5;
+    }
+    .hint kbd {
+      background: #e5e7eb;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-family: inherit;
+    }
+    .section {
+      padding: 12px 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #9ca3af;
+      margin-bottom: 8px;
+    }
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .setting-row label { font-size: 12px; color: #6b7280; }
+    .setting-row select,
+    .setting-row input {
+      font-size: 12px;
+      padding: 4px 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: white;
+      color: #374151;
+      max-width: 180px;
+    }
+    .source-info {
+      padding: 8px 16px;
+      font-size: 11px;
+      color: #9ca3af;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+    }
+    .source-info a { color: #4f46e5; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🔊 TTS Reader</h1>
+    <span class="provider-badge" id="providerBadge">edge-tts</span>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Ready</span>
+    <span id="segmentCounter" style="margin-left:auto; font-size:11px; color:#9ca3af;"></span>
+  </div>
+
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <div class="hint" id="hintText">
+    <kbd data-i18n="hint.rightClick">Right-click</kbd> on any page → <b data-i18n="hint.readPage">Read This Page</b> or <b data-i18n="hint.readSelection">Read Selection</b><br />
+    <span data-i18n="hint.background">Keep this popup open while playing. Use the context menu to pause, skip, or stop.</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title" data-i18n="settings.title">Settings</div>
+    <div class="setting-row">
+      <label for="providerSelect" data-i18n="settings.provider">Provider</label>
+      <select id="providerSelect">
+        <option value="edge-tts">Edge TTS (free)</option>
+        <option value="openai">OpenAI TTS</option>
+        <option value="google">Google Cloud TTS</option>
+        <option value="custom">Custom API</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <label for="voiceSelect" data-i18n="settings.voice">Voice</label>
+      <select id="voiceSelect"></select>
+    </div>
+    <div class="setting-row">
+      <label for="rateSelect" data-i18n="settings.rate">Rate</label>
+      <select id="rateSelect">
+        <option value="-50%">-50%</option>
+        <option value="-25%">-25%</option>
+        <option value="+0%" selected>Normal</option>
+        <option value="+25%">+25%</option>
+        <option value="+50%">+50%</option>
+        <option value="+100%">+100%</option>
+      </select>
+    </div>
+    <div class="setting-row" id="apiKeyRow" style="display:none;">
+      <label for="apiKeyInput" data-i18n="settings.apiKey">API Key</label>
+      <input type="password" id="apiKeyInput" placeholder="sk-..." />
+    </div>
+    <div class="setting-row" id="apiUrlRow" style="display:none;">
+      <label for="apiUrlInput" data-i18n="settings.endpoint">Endpoint</label>
+      <input type="text" id="apiUrlInput" placeholder="https://..." />
+    </div>
+  </div>
+
+  <div class="source-info">
+    <span data-i18n="settings.applyNext">Settings apply to next session</span>
+    <a href="#" id="optionsLink">⚙ <span data-i18n="settings.options">Options</span></a>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="popupPlayer.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

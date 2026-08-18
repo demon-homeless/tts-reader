@@ -1,0 +1,5 @@
+{
+  "extDescription": {
+    "message": "AI 텍스트-음성 변환으로 웹 페이지를 읽습니다. Edge TTS, OpenAI, Google Cloud TTS 및 사용자 지정 API 지원."
+  }
+}

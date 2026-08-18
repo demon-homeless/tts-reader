@@ -1,0 +1,5 @@
+{
+  "extDescription": {
+    "message": "Чтение веб-страниц вслух с помощью ИИ-синтеза речи. Поддерживает Edge TTS, OpenAI, Google Cloud TTS и пользовательские API."
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "extDescription": {
+    "message": "Lire les pages web à voix haute avec la synthèse vocale IA. Prend en charge Edge TTS, OpenAI, Google Cloud TTS et API personnalisés."
+  }
+}
