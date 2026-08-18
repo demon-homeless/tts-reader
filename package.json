@@ -1,0 +1,210 @@
+{
+  "name": "sub-life-tts-reader",
+  "displayName": "TTS Reader",
+  "icon": "icon.png",
+  "description": "%extension.description%",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "author": {
+    "name": "Demon",
+    "email": "demon-homeless@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@git.lan:8022/demon/TTS-Reader.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/vscode/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "edgeTts.readSelection",
+        "title": "%command.readSelection.title%"
+      },
+      {
+        "command": "edgeTts.readFile",
+        "title": "%command.readFile.title%"
+      },
+      {
+        "command": "edgeTts.readClipboard",
+        "title": "%command.readClipboard.title%"
+      },
+      {
+        "command": "edgeTts.stop",
+        "title": "%command.stop.title%"
+      },
+      {
+        "command": "edgeTts.pause",
+        "title": "%command.pause.title%"
+      },
+      {
+        "command": "edgeTts.skipNext",
+        "title": "%command.skipNext.title%"
+      },
+      {
+        "command": "edgeTts.listVoices",
+        "title": "%command.listVoices.title%"
+      },
+      {
+        "command": "edgeTts.cleanupTemp",
+        "title": "%command.cleanupTemp.title%"
+      },
+      {
+        "command": "edgeTts.resume",
+        "title": "%command.resume.title%"
+      },
+      {
+        "command": "edgeTts.readFromCursor",
+        "title": "%command.readFromCursor.title%"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "edgeTts.readSelection",
+          "when": "editorHasSelection",
+          "group": "navigation@10"
+        },
+        {
+          "command": "edgeTts.readFromCursor",
+          "when": "editorTextFocus && !editorHasSelection",
+          "group": "navigation@11"
+        },
+        {
+          "command": "edgeTts.pause",
+          "when": "edgeTts.isPaused",
+          "group": "navigation@20"
+        },
+        {
+          "command": "edgeTts.stop",
+          "when": "edgeTts.isPlaying",
+          "group": "navigation@21"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "%config.title%",
+      "properties": {
+        "edgeTts.provider": {
+          "type": "string",
+          "enum": [
+            "edge-tts",
+            "openai",
+            "google",
+            "custom"
+          ],
+          "default": "edge-tts",
+          "description": "%config.provider.description%"
+        },
+        "edgeTts.voice": {
+          "type": "string",
+          "default": "en-US-AvaMultilingualNeural",
+          "description": "%config.voice.description%"
+        },
+        "edgeTts.rate": {
+          "type": "string",
+          "default": "+0%",
+          "description": "%config.rate.description%"
+        },
+        "edgeTts.volume": {
+          "type": "string",
+          "default": "+0%",
+          "description": "%config.volume.description%"
+        },
+        "edgeTts.pitch": {
+          "type": "string",
+          "default": "+0Hz",
+          "description": "%config.pitch.description%"
+        },
+        "edgeTts.maxSegmentChars": {
+          "type": "number",
+          "default": 180,
+          "minimum": 40,
+          "maximum": 1000,
+          "description": "%config.maxSegmentChars.description%"
+        },
+        "edgeTts.minSegmentChars": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "%config.minSegmentChars.description%"
+        },
+        "edgeTts.segmentMode": {
+          "type": "string",
+          "enum": [
+            "smart",
+            "sentence",
+            "paragraph"
+          ],
+          "default": "smart",
+          "description": "%config.segmentMode.description%"
+        },
+        "edgeTts.preloadSegments": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 10,
+          "description": "%config.preloadSegments.description%"
+        },
+        "edgeTts.playbackRate": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0.5,
+          "maximum": 3,
+          "description": "%config.playbackRate.description%"
+        },
+        "edgeTts.proxyUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.proxyUrl.description%"
+        },
+        "edgeTts.apiUrl": {
+          "type": "string",
+          "default": "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1",
+          "description": "%config.apiUrl.description%"
+        },
+        "edgeTts.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "%config.apiKey.description%"
+        },
+        "edgeTts.model": {
+          "type": "string",
+          "default": "",
+          "description": "%config.model.description%"
+        },
+        "edgeTts.trustedClientToken": {
+          "type": "string",
+          "default": "6A5AA1D4EAFF4E9FB37E23D68491D6F4",
+          "description": "%config.trustedClientToken.description%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./ && npm run copy-chrome",
+    "copy-chrome": "node -e \"const fs=require('fs'),p=require('path');function cp(s,d){fs.mkdirSync(d,{recursive:true});for(const f of fs.readdirSync(s)){const sp=p.join(s,f),dp=p.join(d,f);if(fs.statSync(sp).isDirectory())cp(sp,dp);else fs.copyFileSync(sp,dp)}}cp('src/chrome','out/chrome');console.log('Chrome assets copied to out/chrome/')\"",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
+  }
+}

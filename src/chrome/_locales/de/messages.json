@@ -1,0 +1,5 @@
+{
+  "extDescription": {
+    "message": "Webseiten mit KI-Sprachsynthese vorlesen. Unterstützt Edge TTS, OpenAI, Google Cloud TTS und benutzerdefinierte APIs."
+  }
+}

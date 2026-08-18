@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TTS Reader — Options</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      color: #1a1a2e;
+      background: #f8f9fa;
+      padding: 24px;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .card h2 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #374151;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .form-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .form-row:last-child { margin-bottom: 0; }
+    .form-row label {
+      font-size: 13px;
+      color: #6b7280;
+      min-width: 120px;
+    }
+    .form-row select,
+    .form-row input {
+      font-size: 13px;
+      padding: 6px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: white;
+      color: #374151;
+      flex: 1;
+      max-width: 320px;
+    }
+    .form-row input[type="number"] {
+      max-width: 80px;
+    }
+    .hint {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+    .save-btn {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 16px;
+      transition: all 0.15s;
+    }
+    .save-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
+    .save-msg {
+      font-size: 12px;
+      color: #10b981;
+      margin-left: 12px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .save-msg.show { opacity: 1; }
+    .provider-desc {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 12px;
+      padding: 8px 12px;
+      background: #f3f4f6;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>⚙ <span data-i18n="options.title">Options</span></h1>
+
+  <div class="card">
+    <h2>🔌 <span data-i18n="options.provider">TTS Provider</span></h2>
+    <div class="provider-desc" id="providerDesc"></div>
+    <div class="form-row">
+      <label for="provider" data-i18n="settings.provider">Provider</label>
+      <select id="provider">
+        <option value="edge-tts">Edge TTS (free, no key)</option>
+        <option value="openai">OpenAI TTS (API key required)</option>
+        <option value="google">Google Cloud TTS (API key required)</option>
+        <option value="custom">Custom HTTP endpoint</option>
+      </select>
+    </div>
+    <div class="form-row" id="apiKeyRow" style="display:none;">
+      <label for="apiKey" data-i18n="settings.apiKey">API Key</label>
+      <input type="password" id="apiKey" placeholder="sk-..." />
+      <div class="hint" style="width:100%; margin-top:4px;" data-i18n="options.apiKeyHint">Stored locally in chrome.storage.sync</div>
+    </div>
+    <div class="form-row" id="apiUrlRow" style="display:none;">
+      <label for="apiUrl" data-i18n="settings.endpoint">Endpoint URL</label>
+      <input type="text" id="apiUrl" placeholder="https://api.example.com/tts" />
+      <div class="hint" style="width:100%; margin-top:4px;" data-i18n="options.endpointHint">POST with JSON body: {text, voice, rate, volume, pitch}</div>
+    </div>
+    <div class="form-row" id="modelRow" style="display:none;">
+      <label for="model" data-i18n="options.model">Model</label>
+      <input type="text" id="model" placeholder="tts-1" />
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🎙 <span data-i18n="options.voiceSpeech">Voice & Speech</span></h2>
+    <div class="form-row">
+      <label for="voice" data-i18n="settings.voice">Voice</label>
+      <select id="voice"></select>
+    </div>
+    <div class="form-row">
+      <label for="rate" data-i18n="settings.rate">Rate</label>
+      <select id="rate">
+        <option value="-50%">-50% <span data-i18n="rate.verySlow">very slow</span></option>
+        <option value="-25%">-25% <span data-i18n="rate.slow">slow</span></option>
+        <option value="+0%" selected><span data-i18n="rate.normal">Normal</span></option>
+        <option value="+25%">+25% <span data-i18n="rate.fast">fast</span></option>
+        <option value="+50%">+50% <span data-i18n="rate.veryFast">very fast</span></option>
+        <option value="+100%">+100% <span data-i18n="rate.maximum">maximum</span></option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="volume" data-i18n="options.volume">Volume</label>
+      <select id="volume">
+        <option value="-50%">-50%</option>
+        <option value="-25%">-25%</option>
+        <option value="+0%" selected><span data-i18n="rate.normal">Normal</span></option>
+        <option value="+25%">+25%</option>
+        <option value="+50%">+50%</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="pitch" data-i18n="options.pitch">Pitch</label>
+      <select id="pitch">
+        <option value="-50Hz"><span data-i18n="pitch.lower">Lower</span></option>
+        <option value="-25Hz"><span data-i18n="pitch.slightlyLower">Slightly lower</span></option>
+        <option value="+0Hz" selected><span data-i18n="rate.normal">Normal</span></option>
+        <option value="+25Hz"><span data-i18n="pitch.slightlyHigher">Slightly higher</span></option>
+        <option value="+50Hz"><span data-i18n="pitch.higher">Higher</span></option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="playbackRate" data-i18n="options.playbackSpeed">Playback Speed</label>
+      <input type="number" id="playbackRate" min="0.5" max="3.0" step="0.1" value="1.0" />
+      <div class="hint" style="width:100%; margin-top:4px;" data-i18n="options.playbackSpeedHint">Client-side speed multiplier (0.5x – 3.0x)</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📝 <span data-i18n="options.segmentation">Segmentation</span></h2>
+    <div class="form-row">
+      <label for="segmentMode" data-i18n="options.mode">Mode</label>
+      <select id="segmentMode">
+        <option value="smart" selected data-i18n="options.mode.smart">Smart (auto)</option>
+        <option value="sentence" data-i18n="options.mode.sentence">Sentence</option>
+        <option value="paragraph" data-i18n="options.mode.paragraph">Paragraph</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="maxChars" data-i18n="options.maxChars">Max chars/segment</label>
+      <input type="number" id="maxChars" min="40" max="1000" value="180" />
+    </div>
+    <div class="form-row">
+      <label for="minChars" data-i18n="options.minChars">Min chars/segment</label>
+      <input type="number" id="minChars" min="1" max="200" value="20" />
+    </div>
+    <div class="form-row">
+      <label for="preload" data-i18n="options.preload">Preload segments</label>
+      <input type="number" id="preload" min="0" max="10" value="2" />
+      <div class="hint" style="width:100%; margin-top:4px;" data-i18n="options.preloadHint">Number of segments to synthesize ahead (0–10)</div>
+    </div>
+  </div>
+
+  <button class="save-btn" id="saveBtn" data-i18n="options.save">Save Settings</button>
+  <span class="save-msg" id="saveMsg">✓ <span data-i18n="options.saved">Saved</span></span>
+
+  <script src="i18n.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

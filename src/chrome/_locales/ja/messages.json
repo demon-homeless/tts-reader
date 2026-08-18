@@ -1,0 +1,5 @@
+{
+  "extDescription": {
+    "message": "AIテキストトゥスピーチでウェブページを読み上げる。Edge TTS、OpenAI、Google Cloud TTS、カスタムAPIに対応。"
+  }
+}
