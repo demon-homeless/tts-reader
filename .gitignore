@@ -4,3 +4,4 @@
 package-lock.json
 **/**.vsix
 /test*
+.vscode/

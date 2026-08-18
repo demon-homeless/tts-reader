@@ -4,7 +4,7 @@
   "icon": "icon.png",
   "description": "%extension.description%",
   "version": "0.1.0",
-  "publisher": "local",
+  "publisher": "DemonHomeless",
   "license": "MIT",
   "author": {
     "name": "Demon",
