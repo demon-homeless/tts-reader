@@ -1,15 +1,17 @@
 /**
  * popup.js — Popup UI for TTS Reader.
  *
- * The popup is a settings panel. Playback is controlled via the
- * right-click context menu. The popup shows current session status
- * and allows changing provider/voice/rate/API settings.
+ * The popup is the main control panel:
+ *   - Read buttons (selection / page) when idle
+ *   - Stop / Pause / Resume / Skip when playing
+ *   - Settings (provider, voice, rate, API key, endpoint)
  */
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
 let settings = {};
 let statusTimer = null;
+let currentTabId = null;
 
 // ─── DOM refs ───────────────────────────────────────────────────────────────
 
@@ -17,7 +19,6 @@ const $statusDot = document.getElementById("statusDot");
 const $statusText = document.getElementById("statusText");
 const $segmentCounter = document.getElementById("segmentCounter");
 const $progressFill = document.getElementById("progressFill");
-const $currentSegment = document.getElementById("currentSegment");
 const $providerBadge = document.getElementById("providerBadge");
 const $providerSelect = document.getElementById("providerSelect");
 const $voiceSelect = document.getElementById("voiceSelect");
@@ -27,7 +28,16 @@ const $apiKeyInput = document.getElementById("apiKeyInput");
 const $apiUrlRow = document.getElementById("apiUrlRow");
 const $apiUrlInput = document.getElementById("apiUrlInput");
 const $optionsLink = document.getElementById("optionsLink");
-const $hintText = document.getElementById("hintText");
+
+// Action buttons
+const $idleActions = document.getElementById("idleActions");
+const $playingActions = document.getElementById("playingActions");
+const $btnReadSelection = document.getElementById("btnReadSelection");
+const $btnReadPage = document.getElementById("btnReadPage");
+const $btnStop = document.getElementById("btnStop");
+const $btnPause = document.getElementById("btnPause");
+const $btnResume = document.getElementById("btnResume");
+const $btnSkip = document.getElementById("btnSkip");
 
 // ─── Voice lists per provider ───────────────────────────────────────────────
 
@@ -76,6 +86,10 @@ const VOICES = {
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 async function init() {
+  // Get the active tab
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  currentTabId = tab ? tab.id : null;
+
   settings = await chrome.runtime.sendMessage({ type: "getSettings" });
 
   $providerSelect.value = settings.provider || "edge-tts";
@@ -86,6 +100,7 @@ async function init() {
   populateVoices(settings.provider, settings.voice);
   $providerBadge.textContent = settings.provider || "edge-tts";
 
+  // Event listeners
   $providerSelect.addEventListener("change", onProviderChange);
   $voiceSelect.addEventListener("change", onVoiceChange);
   $rateSelect.addEventListener("change", onRateChange);
@@ -95,6 +110,14 @@ async function init() {
     e.preventDefault();
     chrome.runtime.openOptionsPage();
   });
+
+  // Action button listeners
+  $btnReadPage.addEventListener("click", onReadPage);
+  $btnReadSelection.addEventListener("click", onReadSelection);
+  $btnStop.addEventListener("click", onStop);
+  $btnPause.addEventListener("click", onPause);
+  $btnResume.addEventListener("click", onResume);
+  $btnSkip.addEventListener("click", onSkip);
 
   // Show current session status
   const status = await chrome.runtime.sendMessage({ type: "getSessionStatus" });
@@ -107,14 +130,69 @@ async function init() {
   startStatusPolling();
 }
 
+// ─── Action handlers ────────────────────────────────────────────────────────
+
+async function onReadPage() {
+  if (!currentTabId) return;
+  try {
+    const response = await chrome.tabs.sendMessage(currentTabId, { type: "extractPage" });
+    if (response && response.text) {
+      chrome.runtime.sendMessage({
+        type: "startReading",
+        text: response.text,
+        sourceLabel: "Page",
+        tabId: currentTabId,
+      });
+    }
+  } catch (e) {
+    console.warn("[popup] Read page failed:", e.message);
+  }
+}
+
+async function onReadSelection() {
+  if (!currentTabId) return;
+  try {
+    const response = await chrome.tabs.sendMessage(currentTabId, { type: "extractSelection" });
+    if (response && response.text) {
+      chrome.runtime.sendMessage({
+        type: "startReading",
+        text: response.text,
+        sourceLabel: "Selection",
+        tabId: currentTabId,
+      });
+    }
+  } catch (e) {
+    console.warn("[popup] Read selection failed:", e.message);
+  }
+}
+
+async function onStop() {
+  await chrome.runtime.sendMessage({ type: "stopSession" });
+}
+
+async function onPause() {
+  await chrome.runtime.sendMessage({ type: "pausePlayback" });
+}
+
+async function onResume() {
+  await chrome.runtime.sendMessage({ type: "resumePlayback" });
+}
+
+async function onSkip() {
+  await chrome.runtime.sendMessage({ type: "skipSegment" });
+}
+
+// ─── Status polling ─────────────────────────────────────────────────────────
+
 function startStatusPolling() {
   if (statusTimer) return;
   statusTimer = setInterval(async () => {
     try {
       const s = await chrome.runtime.sendMessage({ type: "getSessionStatus" });
       updateStatus(s);
+      // Check for text selection to show/hide the selection button
+      updateSelectionButton();
     } catch (e) {
-      // Extension context invalidated (e.g. during a reload) — stop polling
       stopStatusPolling();
     }
   }, 2000);
@@ -180,27 +258,26 @@ function onProviderChange() {
   saveSettings();
 }
 
-function onVoiceChange() {
-  saveSettings();
-}
-
-function onRateChange() {
-  saveSettings();
-}
-
-function onApiKeyChange() {
-  saveSettings();
-}
-
-function onApiUrlChange() {
-  saveSettings();
-}
+function onVoiceChange() { saveSettings(); }
+function onRateChange() { saveSettings(); }
+function onApiKeyChange() { saveSettings(); }
+function onApiUrlChange() { saveSettings(); }
 
 // ─── Status display ─────────────────────────────────────────────────────────
 
 function updateStatus(status) {
   const i18n = self.i18n;
-  if (!status || status.status === "idle") {
+  const isIdle = !status || status.status === "idle";
+  const isPlaying = status && (status.status === "playing" || status.status === "synthesizing");
+  const isPaused = status && status.status === "paused";
+
+  // Toggle button visibility
+  $idleActions.style.display = isIdle ? "block" : "none";
+  $playingActions.style.display = !isIdle ? "block" : "none";
+  $btnPause.style.display = isPaused ? "none" : "flex";
+  $btnResume.style.display = isPaused ? "flex" : "none";
+
+  if (isIdle) {
     $statusDot.className = "status-dot";
     $statusText.textContent = i18n.t("status.ready");
     $segmentCounter.textContent = "";
@@ -233,10 +310,21 @@ function updateStatus(status) {
   }
 }
 
-// ─── Start ──────────────────────────────────────────────────────────────────
+// ─── Selection detection ────────────────────────────────────────────────────
 
-// The popup window closes when it loses focus — clear the polling timer
-// so it cannot leak (the document is destroyed anyway, but be explicit).
+async function updateSelectionButton() {
+  if (!currentTabId) return;
+  try {
+    const resp = await chrome.tabs.sendMessage(currentTabId, { type: "hasSelection" });
+    const hasSel = resp && resp.hasSelection;
+    $btnReadSelection.style.display = hasSel ? "flex" : "none";
+  } catch {
+    // Content script not available
+  }
+}
+
+// ─── Cleanup ────────────────────────────────────────────────────────────────
+
 window.addEventListener("pagehide", stopStatusPolling);
 
 init().catch((e) => {

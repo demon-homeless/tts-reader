@@ -75,6 +75,12 @@ const I18N_LOCALES = {
     "error.clipboardFailed": "Clipboard read failed",
     "msg.cleaned": "Cleaned up {count} cached audio segment(s).",
     "msg.noTempFiles": "No temp files to clean.",
+    "action.readSelection": "Read Selection",
+    "action.readPage": "Read This Page",
+    "action.stop": "Stop Reading",
+    "action.pause": "Pause",
+    "action.resume": "Resume",
+    "action.skip": "Skip",
   },
   zh_CN: {
     "status.ready": "就绪 — 右键朗读",
@@ -138,6 +144,12 @@ const I18N_LOCALES = {
     "error.clipboardFailed": "剪贴板读取失败",
     "msg.cleaned": "已清理 {count} 个缓存音频片段。",
     "msg.noTempFiles": "没有需要清理的临时文件。",
+    "action.readSelection": "朗读选中文本",
+    "action.readPage": "朗读此页面",
+    "action.stop": "停止朗读",
+    "action.pause": "暂停",
+    "action.resume": "继续朗读",
+    "action.skip": "跳过",
   },
   ja: {
     "status.ready": "準備完了 — クリックして読み上げ",
@@ -196,7 +208,13 @@ const I18N_LOCALES = {
     "pitch.slightlyLower": "やや低い",
     "pitch.slightlyHigher": "やや高い",
     "pitch.higher": "高い",
-  },
+
+    "action.readSelection": "選択範囲を読み上げる",
+    "action.readPage": "このページを読み上げる",
+    "action.stop": "読み上げを停止",
+    "action.pause": "一時停止",
+    "action.resume": "再開",
+    "action.skip": "スキップ",  },
   ko: {
     "status.ready": "준비 완료 — 우클릭하여 읽기",
     "status.playing": "재생 중",
@@ -254,7 +272,13 @@ const I18N_LOCALES = {
     "pitch.slightlyLower": "약간 낮음",
     "pitch.slightlyHigher": "약간 높음",
     "pitch.higher": "높음",
-  },
+
+    "action.readSelection": "선택 범위 읽기",
+    "action.readPage": "이 페이지 읽기",
+    "action.stop": "읽기 정지",
+    "action.pause": "일시 정지",
+    "action.resume": "계속",
+    "action.skip": "건너뛰기",  },
   fr: {
     "status.ready": "Prêt — clic droit pour lire",
     "status.playing": "Lecture",
@@ -312,7 +336,13 @@ const I18N_LOCALES = {
     "pitch.slightlyLower": "Légèrement plus bas",
     "pitch.slightlyHigher": "Légèrement plus haut",
     "pitch.higher": "Plus haut",
-  },
+
+    "action.readSelection": "Lire la sélection",
+    "action.readPage": "Lire cette page",
+    "action.stop": "Arrêter la lecture",
+    "action.pause": "Pause",
+    "action.resume": "Reprendre",
+    "action.skip": "Passer",  },
   de: {
     "status.ready": "Bereit — Rechtsklick zum Vorlesen",
     "status.playing": "Wiedergabe",
@@ -370,7 +400,13 @@ const I18N_LOCALES = {
     "pitch.slightlyLower": "Etwas tiefer",
     "pitch.slightlyHigher": "Etwas höher",
     "pitch.higher": "Höher",
-  },
+
+    "action.readSelection": "Auswahl vorlesen",
+    "action.readPage": "Diese Seite vorlesen",
+    "action.stop": "Vorlesen stoppen",
+    "action.pause": "Pause",
+    "action.resume": "Fortsetzen",
+    "action.skip": "Überspringen",  },
   es: {
     "status.ready": "Listo — clic derecho para leer",
     "status.playing": "Reproduciendo",
@@ -428,7 +464,13 @@ const I18N_LOCALES = {
     "pitch.slightlyLower": "Ligeramente más grave",
     "pitch.slightlyHigher": "Ligeramente más agudo",
     "pitch.higher": "Más agudo",
-  },
+
+    "action.readSelection": "Leer selección",
+    "action.readPage": "Leer esta página",
+    "action.stop": "Detener lectura",
+    "action.pause": "Pausa",
+    "action.resume": "Reanudar",
+    "action.skip": "Saltar",  },
   ru: {
     "status.ready": "Готово — правый клик для чтения",
     "status.playing": "Воспроизведение",
@@ -486,12 +528,36 @@ const I18N_LOCALES = {
     "pitch.slightlyLower": "Чуть ниже",
     "pitch.slightlyHigher": "Чуть выше",
     "pitch.higher": "Выше",
-  },
+
+    "action.readSelection": "Читать выделенное",
+    "action.readPage": "Читать эту страницу",
+    "action.stop": "Остановить чтение",
+    "action.pause": "Пауза",
+    "action.resume": "Продолжить",
+    "action.skip": "Пропустить",  },
 };
 
 function detectLocale() {
   try {
-    const lang = (chrome.i18n.getUILanguage() || navigator.language || "en").toLowerCase();
+    // Try multiple sources for the browser language, in order of reliability.
+    // chrome.i18n.getUILanguage() is the most reliable in extension contexts.
+    let lang = "";
+    try {
+      lang = chrome.i18n.getUILanguage();
+    } catch (e) { /* not available */ }
+    if (!lang) {
+      try {
+        lang = navigator.language;
+      } catch (e) { /* not available */ }
+    }
+    if (!lang) {
+      try {
+        lang = navigator.languages && navigator.languages[0];
+      } catch (e) { /* not available */ }
+    }
+    if (!lang) return "en";
+
+    lang = lang.toLowerCase();
     // Chrome uses "zh-CN", "en-US", "ja-JP", etc. Map to our locale keys.
     if (lang.startsWith("zh")) return "zh_CN";
     if (lang.startsWith("ja")) return "ja";

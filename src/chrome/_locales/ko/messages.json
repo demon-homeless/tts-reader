@@ -1,5 +1,14 @@
 {
   "extDescription": {
-    "message": "AI 텍스트-음성 변환으로 웹 페이지를 읽습니다. Edge TTS, OpenAI, Google Cloud TTS 및 사용자 지정 API 지원."
+    "message": "AI 음성으로 웹 페이지 읽기. Edge TTS, OpenAI, Google Cloud TTS, 사용자 지정 API 지원."
+  },
+  "menuReadSelection": {
+    "message": "선택 범위 읽기"
+  },
+  "menuReadPage": {
+    "message": "이 페이지 읽기"
+  },
+  "menuStop": {
+    "message": "읽기 정지"
   }
 }

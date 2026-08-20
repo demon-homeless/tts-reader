@@ -37,6 +37,7 @@
   // ─── Text extraction ──────────────────────────────────────────────────────
 
   function findMainContent() {
+    // Try common content selectors first
     const candidates = [
       "article",
       "main",
@@ -47,6 +48,13 @@
       "div.main-content",
       "div.post-content",
       "div.article-content",
+      "div.prose",
+      "div.markdown-body",
+      "div#article-content",
+      "div.entry-content",
+      "div.post-body",
+      "div.blog-content",
+      "div.document-content",
     ];
 
     for (const selector of candidates) {
@@ -56,17 +64,25 @@
       }
     }
 
+    // Fallback: find the element with the most text content.
+    // Walk all block-level elements and pick the one with the longest
+    // direct text (excluding children's text to avoid double-counting).
     let bestEl = document.body;
     let bestLength = 0;
 
-    const allElements = document.querySelectorAll("div, article, section, main");
+    const allElements = document.querySelectorAll(
+      "div, article, section, main, td, li, p, blockquote, pre"
+    );
     for (const el of allElements) {
+      // Skip elements that are inside the current best element
+      if (bestEl !== document.body && bestEl.contains(el)) continue;
+
       const textLen = el.textContent.trim().length;
-      if (textLen > bestLength && textLen < 500000) {
-        if (textLen > 200) {
-          bestLength = textLen;
-          bestEl = el;
-        }
+      // Accept elements with substantial text, but cap to avoid
+      // grabbing the entire <html> or <body> wrapper.
+      if (textLen > bestLength && textLen < 1000000 && textLen > 200) {
+        bestLength = textLen;
+        bestEl = el;
       }
     }
 
@@ -304,6 +320,12 @@
       case "ttsPing":
         sendResponse({ ok: true, playing: isPlaying, paused: isPaused });
         break;
+      case "hasSelection": {
+        const sel = window.getSelection();
+        const has = !!(sel && sel.rangeCount > 0 && sel.toString().trim());
+        sendResponse({ hasSelection: has });
+        break;
+      }
       // Text extraction messages
       case "extractText": {
         const mainEl = findMainContent();

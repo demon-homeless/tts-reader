@@ -1,5 +1,14 @@
 {
   "extDescription": {
-    "message": "AIテキストトゥスピーチでウェブページを読み上げる。Edge TTS、OpenAI、Google Cloud TTS、カスタムAPIに対応。"
+    "message": "AI音声でウェブページを読み上げ。Edge TTS、OpenAI、Google Cloud TTS、カスタムAPIに対応。"
+  },
+  "menuReadSelection": {
+    "message": "選択範囲を読み上げる"
+  },
+  "menuReadPage": {
+    "message": "このページを読み上げる"
+  },
+  "menuStop": {
+    "message": "読み上げを停止"
   }
 }

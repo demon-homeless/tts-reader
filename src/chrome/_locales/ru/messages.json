@@ -1,5 +1,14 @@
 {
   "extDescription": {
-    "message": "Чтение веб-страниц вслух с помощью ИИ-синтеза речи. Поддерживает Edge TTS, OpenAI, Google Cloud TTS и пользовательские API."
+    "message": "Читайте любую веб-страницу вслух с помощью ИИ-синтеза речи. Поддерживает Edge TTS, OpenAI, Google Cloud TTS и пользовательские API."
+  },
+  "menuReadSelection": {
+    "message": "Читать выделенное"
+  },
+  "menuReadPage": {
+    "message": "Читать эту страницу"
+  },
+  "menuStop": {
+    "message": "Остановить чтение"
   }
 }

@@ -1,5 +1,14 @@
 {
   "extDescription": {
-    "message": "Webseiten mit KI-Sprachsynthese vorlesen. Unterstützt Edge TTS, OpenAI, Google Cloud TTS und benutzerdefinierte APIs."
+    "message": "Lesen Sie jede Webseite laut mit KI-Sprachsynthese. Unterstützt Edge TTS, OpenAI, Google Cloud TTS und benutzerdefinierte APIs."
+  },
+  "menuReadSelection": {
+    "message": "Auswahl vorlesen"
+  },
+  "menuReadPage": {
+    "message": "Diese Seite vorlesen"
+  },
+  "menuStop": {
+    "message": "Vorlesen stoppen"
   }
 }

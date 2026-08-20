@@ -1,5 +1,14 @@
 {
   "extDescription": {
     "message": "Read any web page aloud with AI text-to-speech. Supports Edge TTS, OpenAI, Google Cloud TTS, and custom APIs."
+  },
+  "menuReadSelection": {
+    "message": "Read Selection"
+  },
+  "menuReadPage": {
+    "message": "Read This Page"
+  },
+  "menuStop": {
+    "message": "Stop Reading"
   }
 }

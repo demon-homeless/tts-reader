@@ -586,62 +586,21 @@ function updateBadge() {
 
 function createContextMenu() {
   chrome.contextMenus.removeAll(() => {
-    // ── Read sources (matches VSCode: Read Selection / Read File / Read Clipboard) ──
+    // Flat single-level menu — 3 items only.
+    // Titles are localized via chrome.i18n.getMessage().
     chrome.contextMenus.create({
       id: "tts-read-selection",
-      title: "🔊 TTS: Read Selection",
+      title: chrome.i18n.getMessage("menuReadSelection"),
       contexts: ["selection"],
     });
     chrome.contextMenus.create({
       id: "tts-read-page",
-      title: "🔊 TTS: Read This Page",
-      contexts: ["page"],
-    });
-    chrome.contextMenus.create({
-      id: "tts-read-clipboard",
-      title: "🔊 TTS: Read Clipboard",
-      contexts: ["page"],
-    });
-    chrome.contextMenus.create({
-      id: "tts-separator-1",
-      type: "separator",
-      contexts: ["page", "selection"],
-    });
-    // ── Playback controls (matches VSCode: Pause/Resume / Skip / Stop) ──
-    chrome.contextMenus.create({
-      id: "tts-pause",
-      title: "⏸ TTS: Pause",
-      contexts: ["page"],
-    });
-    chrome.contextMenus.create({
-      id: "tts-resume",
-      title: "▶ TTS: Resume",
-      contexts: ["page"],
-    });
-    chrome.contextMenus.create({
-      id: "tts-skip",
-      title: "⏭ TTS: Skip Segment",
+      title: chrome.i18n.getMessage("menuReadPage"),
       contexts: ["page"],
     });
     chrome.contextMenus.create({
       id: "tts-stop",
-      title: "⏹ TTS: Stop",
-      contexts: ["page"],
-    });
-    chrome.contextMenus.create({
-      id: "tts-separator-2",
-      type: "separator",
-      contexts: ["page", "selection"],
-    });
-    // ── Utilities (matches VSCode: List Voices / Clean Temp) ──
-    chrome.contextMenus.create({
-      id: "tts-list-voices",
-      title: "🎤 TTS: List Voices",
-      contexts: ["page"],
-    });
-    chrome.contextMenus.create({
-      id: "tts-clean-temp",
-      title: "🧹 TTS: Clean Temp Files",
+      title: chrome.i18n.getMessage("menuStop"),
       contexts: ["page"],
     });
   });
@@ -654,11 +613,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         const response = await chrome.tabs.sendMessage(tab.id, { type: "extractPage" });
         if (response && response.text) {
           startReading(response.text, "Page", tab.id).then((r) => r && r.error && console.warn("[background]", r.error));
-        } else {
-          const sel = await chrome.tabs.sendMessage(tab.id, { type: "extractSelection" });
-          if (sel && sel.text) {
-            startReading(sel.text, "Selection", tab.id).then((r) => r && r.error && console.warn("[background]", r.error));
-          }
         }
       } catch {
         // Content script not available
@@ -671,45 +625,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       }
       break;
     }
-    case "tts-read-clipboard": {
-      const result = await readClipboard(tab.id);
-      if (result && result.error) {
-        chrome.notifications.create("tts-clipboard", {
-          type: "basic",
-          iconUrl: "icons/icon128.png",
-          title: "TTS Reader",
-          message: result.error,
-        });
-      }
-      break;
-    }
-    case "tts-pause":
-      await pausePlayback();
-      break;
-    case "tts-resume":
-      await resumePlayback();
-      break;
-    case "tts-skip":
-      await skipSegment();
-      break;
     case "tts-stop":
       await stopSession();
       break;
-    case "tts-list-voices":
-      showVoiceList();
-      break;
-    case "tts-clean-temp": {
-      const result = cleanupTempFiles();
-      chrome.notifications.create("tts-clean", {
-        type: "basic",
-        iconUrl: "icons/icon128.png",
-        title: "TTS Reader",
-        message: result.count > 0
-          ? `Cleaned up ${result.count} cached audio segment(s).`
-          : "No temp files to clean.",
-      });
-      break;
-    }
   }
 });
 

@@ -52,20 +52,49 @@
       transition: width 0.3s ease;
       width: 0%;
     }
-    .hint {
+    /* ── Action buttons ── */
+    .actions {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
       padding: 10px 16px;
-      font-size: 11px;
-      color: #9ca3af;
-      border-bottom: 1px solid #e5e7eb;
-      line-height: 1.5;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
     }
-    .hint kbd {
-      background: #e5e7eb;
-      padding: 1px 5px;
-      border-radius: 3px;
-      font-size: 10px;
-      font-family: inherit;
+    .btn-primary {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: white;
     }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
+    .btn-stop {
+      background: #ef4444;
+      color: white;
+    }
+    .btn-stop:hover { background: #dc2626; }
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #d1d5db;
+    }
+    .btn-secondary:hover { background: #e5e7eb; }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-row .btn { flex: 1; }
+    /* ── Settings ── */
     .section {
       padding: 12px 16px;
       border-top: 1px solid #e5e7eb;
@@ -122,11 +151,37 @@
     <div class="progress-fill" id="progressFill"></div>
   </div>
 
-  <div class="hint" id="hintText">
-    <kbd data-i18n="hint.rightClick">Right-click</kbd> on any page → <b data-i18n="hint.readPage">Read This Page</b> or <b data-i18n="hint.readSelection">Read Selection</b><br />
-    <span data-i18n="hint.background">Keep this popup open while playing. Use the context menu to pause, skip, or stop.</span>
+  <!-- ── Action buttons ── -->
+  <div class="actions" id="actionsArea">
+    <!-- Idle state: Read buttons -->
+    <div id="idleActions">
+      <button class="btn btn-primary" id="btnReadSelection" style="display:none;">
+        📖 <span data-i18n="action.readSelection">Read Selection</span>
+      </button>
+      <button class="btn btn-primary" id="btnReadPage">
+        📄 <span data-i18n="action.readPage">Read This Page</span>
+      </button>
+    </div>
+    <!-- Playing state: Stop + controls -->
+    <div id="playingActions" style="display:none;">
+      <button class="btn btn-stop" id="btnStop">
+        ⏹ <span data-i18n="action.stop">Stop Reading</span>
+      </button>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btnPause">
+          ⏸ <span data-i18n="action.pause">Pause</span>
+        </button>
+        <button class="btn btn-secondary" id="btnResume" style="display:none;">
+          ▶ <span data-i18n="action.resume">Resume</span>
+        </button>
+        <button class="btn btn-secondary" id="btnSkip">
+          ⏭ <span data-i18n="action.skip">Skip</span>
+        </button>
+      </div>
+    </div>
   </div>
 
+  <!-- ── Settings ── -->
   <div class="section">
     <div class="section-title" data-i18n="settings.title">Settings</div>
     <div class="setting-row">

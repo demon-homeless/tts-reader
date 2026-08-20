@@ -1,5 +1,14 @@
 {
   "extDescription": {
-    "message": "Leer páginas web en voz alta con síntesis de voz IA. Compatible con Edge TTS, OpenAI, Google Cloud TTS y API personalizadas."
+    "message": "Lee cualquier página web en voz alta con síntesis de voz IA. Soporta Edge TTS, OpenAI, Google Cloud TTS y APIs personalizadas."
+  },
+  "menuReadSelection": {
+    "message": "Leer selección"
+  },
+  "menuReadPage": {
+    "message": "Leer esta página"
+  },
+  "menuStop": {
+    "message": "Detener lectura"
   }
 }
