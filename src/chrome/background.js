@@ -562,25 +562,25 @@ function getSessionStatus() {
 function updateBadge() {
   if (!currentSession) {
     chrome.action.setBadgeText({ text: "" });
-    return;
+  } else {
+    switch (currentSession.status) {
+      case "playing":
+        chrome.action.setBadgeText({ text: "▶" });
+        chrome.action.setBadgeBackgroundColor({ color: "#4caf50" });
+        break;
+      case "paused":
+        chrome.action.setBadgeText({ text: "⏸" });
+        chrome.action.setBadgeBackgroundColor({ color: "#ff9800" });
+        break;
+      case "synthesizing":
+        chrome.action.setBadgeText({ text: "..." });
+        chrome.action.setBadgeBackgroundColor({ color: "#2196f3" });
+        break;
+      default:
+        chrome.action.setBadgeText({ text: "" });
+    }
   }
-  switch (currentSession.status) {
-    case "playing":
-      chrome.action.setBadgeText({ text: "▶" });
-      chrome.action.setBadgeBackgroundColor({ color: "#4caf50" });
-      break;
-    case "paused":
-      chrome.action.setBadgeText({ text: "⏸" });
-      chrome.action.setBadgeBackgroundColor({ color: "#ff9800" });
-      break;
-    case "synthesizing":
-      chrome.action.setBadgeText({ text: "..." });
-      chrome.action.setBadgeBackgroundColor({ color: "#2196f3" });
-      break;
-    default:
-      chrome.action.setBadgeText({ text: "" });
-  }
-  // Also update the context menu to reflect the new state
+  // Always update the context menu to reflect the new state
   updateContextMenu();
 }
 
