@@ -438,6 +438,47 @@ async function skipSegment() {
 }
 
 /**
+ * Read clipboard text and start a new session.
+ */
+async function readClipboard(tabId) {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const targetTabId = tabId || (tab && tab.id);
+    if (!targetTabId) return { error: "No active tab" };
+
+    // Request clipboard text from the content script (which has the
+    // page's context and can use the Clipboard API with user gesture).
+    const resp = await sendToTab(targetTabId, { type: "readClipboard" });
+    if (resp && resp.text) {
+      return await startReading(resp.text, "clipboard", targetTabId);
+    }
+    return { error: "Clipboard is empty or unreadable" };
+  } catch (e) {
+    return { error: `Clipboard read failed: ${e.message}` };
+  }
+}
+
+/**
+ * Show the voice list (opens options page scrolled to voice section).
+ */
+function showVoiceList() {
+  chrome.tabs.create({ url: chrome.runtime.getURL("options.html#voices") });
+}
+
+/**
+ * Clean up cached audio buffers from the current session.
+ */
+function cleanupTempFiles() {
+  if (currentSession) {
+    const count = currentSession.audioBuffers.size;
+    currentSession.audioBuffers.clear();
+    currentSession.inFlight.clear();
+    return { ok: true, count };
+  }
+  return { ok: true, count: 0 };
+}
+
+/**
  * Stop the current session.
  */
 async function stopSession() {
@@ -545,39 +586,62 @@ function updateBadge() {
 
 function createContextMenu() {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: "tts-read-page",
-      title: "🔊 Read This Page",
-      contexts: ["page"],
-    });
+    // ── Read sources (matches VSCode: Read Selection / Read File / Read Clipboard) ──
     chrome.contextMenus.create({
       id: "tts-read-selection",
-      title: "🔊 Read Selection",
+      title: "🔊 TTS: Read Selection",
       contexts: ["selection"],
     });
     chrome.contextMenus.create({
-      id: "tts-separator",
+      id: "tts-read-page",
+      title: "🔊 TTS: Read This Page",
+      contexts: ["page"],
+    });
+    chrome.contextMenus.create({
+      id: "tts-read-clipboard",
+      title: "🔊 TTS: Read Clipboard",
+      contexts: ["page"],
+    });
+    chrome.contextMenus.create({
+      id: "tts-separator-1",
       type: "separator",
       contexts: ["page", "selection"],
     });
+    // ── Playback controls (matches VSCode: Pause/Resume / Skip / Stop) ──
     chrome.contextMenus.create({
       id: "tts-pause",
-      title: "⏸ Pause TTS",
+      title: "⏸ TTS: Pause",
       contexts: ["page"],
     });
     chrome.contextMenus.create({
       id: "tts-resume",
-      title: "▶ Resume TTS",
+      title: "▶ TTS: Resume",
       contexts: ["page"],
     });
     chrome.contextMenus.create({
       id: "tts-skip",
-      title: "⏭ Skip Segment",
+      title: "⏭ TTS: Skip Segment",
       contexts: ["page"],
     });
     chrome.contextMenus.create({
       id: "tts-stop",
-      title: "⏹ Stop TTS",
+      title: "⏹ TTS: Stop",
+      contexts: ["page"],
+    });
+    chrome.contextMenus.create({
+      id: "tts-separator-2",
+      type: "separator",
+      contexts: ["page", "selection"],
+    });
+    // ── Utilities (matches VSCode: List Voices / Clean Temp) ──
+    chrome.contextMenus.create({
+      id: "tts-list-voices",
+      title: "🎤 TTS: List Voices",
+      contexts: ["page"],
+    });
+    chrome.contextMenus.create({
+      id: "tts-clean-temp",
+      title: "🧹 TTS: Clean Temp Files",
       contexts: ["page"],
     });
   });
@@ -607,6 +671,18 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       }
       break;
     }
+    case "tts-read-clipboard": {
+      const result = await readClipboard(tab.id);
+      if (result && result.error) {
+        chrome.notifications.create("tts-clipboard", {
+          type: "basic",
+          iconUrl: "icons/icon128.png",
+          title: "TTS Reader",
+          message: result.error,
+        });
+      }
+      break;
+    }
     case "tts-pause":
       await pausePlayback();
       break;
@@ -619,6 +695,21 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     case "tts-stop":
       await stopSession();
       break;
+    case "tts-list-voices":
+      showVoiceList();
+      break;
+    case "tts-clean-temp": {
+      const result = cleanupTempFiles();
+      chrome.notifications.create("tts-clean", {
+        type: "basic",
+        iconUrl: "icons/icon128.png",
+        title: "TTS Reader",
+        message: result.count > 0
+          ? `Cleaned up ${result.count} cached audio segment(s).`
+          : "No temp files to clean.",
+      });
+      break;
+    }
   }
 });
 
@@ -684,6 +775,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       }
       sendResponse({ ok: true });
+      break;
+    }
+    case "playbackBlocked": {
+      // CSP or other playback restriction — notify the user
+      const msg = message.reason === "csp"
+        ? `This site's Content Security Policy (CSP) blocks audio playback.\n\nThe page restricts which media sources are allowed (media-src directive). TTS audio cannot be played on this page.\n\nTry opening the text in a new tab or using a different page.`
+        : `Audio playback is blocked: ${message.error}`;
+      chrome.notifications.create("tts-blocked", {
+        type: "basic",
+        iconUrl: "icons/icon128.png",
+        title: "TTS Reader — Playback Blocked",
+        message: msg,
+      });
+      // Stop the session since playback won't work
+      if (currentSession) {
+        void stopSession();
+      }
+      sendResponse({ ok: true });
+      break;
+    }
+    case "readClipboard": {
+      // Requested by background's readClipboard() — handled in content script
+      // This case should not be reached (background sends to content script directly)
+      sendResponse({ error: "Not handled in background" });
       break;
     }
     default:

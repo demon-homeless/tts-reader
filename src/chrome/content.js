@@ -121,6 +121,27 @@
   let isPaused = false;
   let playbackRate = 1.0;
   let currentGeneration = -1;
+  let lastCspError = "";
+
+  /**
+   * Detect whether the error is a CSP media-src violation.
+   */
+  function isCspError(errMsg) {
+    return /content security policy|csp|media-src/i.test(errMsg || "");
+  }
+
+  /**
+   * Show a user-facing notification when playback fails due to CSP.
+   */
+  function showCspNotification(errMsg) {
+    if (lastCspError === errMsg) return; // avoid spam
+    lastCspError = errMsg;
+    chrome.runtime.sendMessage({
+      type: "playbackBlocked",
+      error: errMsg,
+      reason: "csp",
+    }).catch(() => {});
+  }
 
   /**
    * Create (or reuse) the hidden <audio> element.
@@ -149,12 +170,23 @@
 
   /**
    * Play a base64-encoded MP3 segment.
-   * Resolves when the segment ends or errors.
+   *
+   * Uses a base64 data URI directly (no Blob / object URL) to bypass
+   * page CSP `media-src` restrictions. Data URIs are not subject to
+   * `media-src` in Chromium's CSP enforcement for <audio> elements.
+   *
+   * If the data URI is still blocked (e.g. CSP `media-src 'none'`),
+   * a user-facing notification is sent to the background so the user
+   * is informed of the reason.
+   *
+   * The `isPlaying` gate is intentionally NOT used here — the background
+   * controls the segment flow (it only sends the next segment after the
+   * previous one ends). If we gate on `isPlaying`, a race between the
+   * `ended` event and the `isPlaying = false` reset can drop segments
+   * and break continuous playback.
    */
   function playSegment({ audio, index, total, generation }) {
     // Generation check: drop messages from an older session.
-    // A new session always has a HIGHER generation than the last stop,
-    // so we accept generation >= currentGeneration (or first message).
     if (generation !== undefined && currentGeneration !== -1 && generation < currentGeneration) {
       return;
     }
@@ -162,22 +194,12 @@
       currentGeneration = generation;
     }
 
-    // If already playing, ignore
-    if (isPlaying) return;
-
     const el = ensureAudioElement();
 
     try {
-      // Decode base64 → Blob → object URL
-      const binaryString = atob(audio);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: "audio/mpeg" });
-      const objectUrl = URL.createObjectURL(blob);
-
-      el.src = objectUrl;
+      // Use base64 data URI directly — bypasses CSP media-src restrictions
+      // that block blob: URLs on sites like GitHub.
+      el.src = "data:audio/mpeg;base64," + audio;
       el.playbackRate = playbackRate;
       isPlaying = true;
       isPaused = false;
@@ -193,10 +215,13 @@
           if (watchdog) clearTimeout(watchdog);
           el.removeEventListener("ended", onEnded);
           el.removeEventListener("error", onError);
-          URL.revokeObjectURL(objectUrl);
           isPlaying = false;
 
           if (wasError) {
+            // Detect CSP violations and notify the user
+            if (isCspError(errMsg)) {
+              showCspNotification(errMsg);
+            }
             chrome.runtime
               .sendMessage({ type: "playError", error: errMsg || "audio playback error", index, generation })
               .catch(() => {});
@@ -211,7 +236,15 @@
         const onEnded = () => finish(false);
         const onError = () => {
           const code = el && el.error ? el.error.code : 0;
-          finish(true, `audio element error (code ${code})`);
+          // MediaError codes:
+          //   1 = aborted, 2 = network, 3 = decode, 4 = source not supported
+          // CSP violations typically surface as code 4 or a generic error.
+          // The actual CSP message is in the console, so we construct a
+          // descriptive message that includes the CSP pattern for detection.
+          const msg = code === 4
+            ? "audio source not supported (possible CSP media-src restriction)"
+            : `audio element error (code ${code})`;
+          finish(true, msg);
         };
 
         el.addEventListener("ended", onEnded, { once: true });
@@ -223,11 +256,15 @@
             finish(true, "audio watchdog timeout");
           }, 300000);
         }).catch((err) => {
-          finish(true, err.message);
+          const msg = err && err.message ? err.message : String(err);
+          finish(true, msg);
         });
       });
     } catch (err) {
       isPlaying = false;
+      if (isCspError(err.message)) {
+        showCspNotification(err.message);
+      }
       chrome.runtime
         .sendMessage({ type: "playError", error: err.message, index, generation })
         .catch(() => {});
@@ -303,6 +340,18 @@
         }
         sendResponse({ text: extractTextFromElement(el) });
         break;
+      }
+      case "readClipboard": {
+        // Read clipboard text. This is called from the background via
+        // chrome.tabs.sendMessage when the user clicks "Read Clipboard"
+        // in the context menu. The context menu click counts as a user
+        // gesture, so navigator.clipboard.readText() should work.
+        navigator.clipboard.readText().then((text) => {
+          sendResponse({ text: text || "" });
+        }).catch((err) => {
+          sendResponse({ error: err.message, text: "" });
+        });
+        return true; // async response
       }
       default:
         // Don't respond to unknown messages — let them pass through
