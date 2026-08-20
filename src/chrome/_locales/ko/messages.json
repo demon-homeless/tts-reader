@@ -3,12 +3,12 @@
     "message": "AI 음성으로 웹 페이지 읽기. Edge TTS, OpenAI, Google Cloud TTS, 사용자 지정 API 지원."
   },
   "menuReadSelection": {
-    "message": "선택 범위 읽기"
+    "message": "TTS: 선택 범위 읽기"
   },
   "menuReadPage": {
-    "message": "이 페이지 읽기"
+    "message": "TTS: 이 페이지 읽기"
   },
   "menuStop": {
-    "message": "읽기 정지"
+    "message": "TTS: 읽기 정지"
   }
 }

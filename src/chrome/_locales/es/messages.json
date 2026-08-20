@@ -3,12 +3,12 @@
     "message": "Lee cualquier página web en voz alta con síntesis de voz IA. Soporta Edge TTS, OpenAI, Google Cloud TTS y APIs personalizadas."
   },
   "menuReadSelection": {
-    "message": "Leer selección"
+    "message": "TTS: Leer selección"
   },
   "menuReadPage": {
-    "message": "Leer esta página"
+    "message": "TTS: Leer esta página"
   },
   "menuStop": {
-    "message": "Detener lectura"
+    "message": "TTS: Detener lectura"
   }
 }

@@ -3,12 +3,12 @@
     "message": "Lisez n'importe quelle page web à voix haute avec la synthèse vocale IA. Prend en charge Edge TTS, OpenAI, Google Cloud TTS et les API personnalisés."
   },
   "menuReadSelection": {
-    "message": "Lire la sélection"
+    "message": "TTS : Lire la sélection"
   },
   "menuReadPage": {
-    "message": "Lire cette page"
+    "message": "TTS : Lire cette page"
   },
   "menuStop": {
-    "message": "Arrêter la lecture"
+    "message": "TTS : Arrêter la lecture"
   }
 }

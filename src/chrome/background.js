@@ -580,29 +580,50 @@ function updateBadge() {
     default:
       chrome.action.setBadgeText({ text: "" });
   }
+  // Also update the context menu to reflect the new state
+  updateContextMenu();
 }
 
 // ─── Context menu ───────────────────────────────────────────────────────────
 
-function createContextMenu() {
+/**
+ * Rebuild the context menu based on current session state.
+ *
+ * Chrome's contextMenus API doesn't support show/hide, so we rebuild
+ * the menu on every state change:
+ *   - Idle:    "Read This Page"
+ *   - Playing: "Stop Reading"
+ *
+ * "Read Selection" is handled by Chrome's "selection" context — it only
+ * appears when the user has selected text, so no state management needed.
+ */
+function updateContextMenu() {
   chrome.contextMenus.removeAll(() => {
-    // Flat single-level menu — 3 items only.
-    // Titles are localized via chrome.i18n.getMessage().
+    // Selection context — Chrome shows this only when text is selected.
     chrome.contextMenus.create({
       id: "tts-read-selection",
       title: chrome.i18n.getMessage("menuReadSelection"),
       contexts: ["selection"],
+      icons: { "16": "icons/icon16.png", "32": "icons/icon48.png" },
     });
-    chrome.contextMenus.create({
-      id: "tts-read-page",
-      title: chrome.i18n.getMessage("menuReadPage"),
-      contexts: ["page"],
-    });
-    chrome.contextMenus.create({
-      id: "tts-stop",
-      title: chrome.i18n.getMessage("menuStop"),
-      contexts: ["page"],
-    });
+
+    if (currentSession && currentSession.status !== "idle") {
+      // Playing / paused / synthesizing → show Stop
+      chrome.contextMenus.create({
+        id: "tts-stop",
+        title: chrome.i18n.getMessage("menuStop"),
+        contexts: ["page"],
+        icons: { "16": "icons/icon16.png", "32": "icons/icon48.png" },
+      });
+    } else {
+      // Idle → show Read This Page
+      chrome.contextMenus.create({
+        id: "tts-read-page",
+        title: chrome.i18n.getMessage("menuReadPage"),
+        contexts: ["page"],
+        icons: { "16": "icons/icon16.png", "32": "icons/icon48.png" },
+      });
+    }
   });
 }
 
@@ -726,7 +747,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // ─── Init ───────────────────────────────────────────────────────────────────
 
-createContextMenu();
+updateContextMenu();
 chrome.action.setBadgeText({ text: "" });
 
 self.addEventListener("unhandledrejection", (event) => {

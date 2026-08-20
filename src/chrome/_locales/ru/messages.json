@@ -3,12 +3,12 @@
     "message": "Читайте любую веб-страницу вслух с помощью ИИ-синтеза речи. Поддерживает Edge TTS, OpenAI, Google Cloud TTS и пользовательские API."
   },
   "menuReadSelection": {
-    "message": "Читать выделенное"
+    "message": "TTS: Читать выделенное"
   },
   "menuReadPage": {
-    "message": "Читать эту страницу"
+    "message": "TTS: Читать эту страницу"
   },
   "menuStop": {
-    "message": "Остановить чтение"
+    "message": "TTS: Остановить чтение"
   }
 }
