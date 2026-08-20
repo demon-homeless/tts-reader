@@ -708,6 +708,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         currentSession.currentIndex++;
         if (currentSession.currentIndex < currentSession.segments.length) {
           void playSegment(currentSession.currentIndex);
+        } else {
+          // All segments exhausted (last one errored) — clean up
+          currentSession.status = "stopped";
+          currentSession = null;
+          stopHeartbeat();
+          updateBadge();
         }
       }
       sendResponse({ ok: true });
