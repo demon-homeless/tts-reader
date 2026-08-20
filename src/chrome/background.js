@@ -604,7 +604,6 @@ function updateContextMenu() {
       id: "tts-read-selection",
       title: chrome.i18n.getMessage("menuReadSelection"),
       contexts: ["selection"],
-      icons: { "16": "icons/icon16.png", "32": "icons/icon48.png" },
     });
 
     if (currentSession && currentSession.status !== "idle") {
@@ -613,7 +612,6 @@ function updateContextMenu() {
         id: "tts-stop",
         title: chrome.i18n.getMessage("menuStop"),
         contexts: ["page"],
-        icons: { "16": "icons/icon16.png", "32": "icons/icon48.png" },
       });
     } else {
       // Idle → show Read This Page
@@ -621,7 +619,6 @@ function updateContextMenu() {
         id: "tts-read-page",
         title: chrome.i18n.getMessage("menuReadPage"),
         contexts: ["page"],
-        icons: { "16": "icons/icon16.png", "32": "icons/icon48.png" },
       });
     }
   });
