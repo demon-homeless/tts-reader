@@ -9,7 +9,9 @@
     "activeTab",
     "scripting",
     "tabs",
-    "contextMenus"
+    "contextMenus",
+    "notifications",
+    "clipboardRead"
   ],
   "host_permissions": [
     "https://speech.platform.bing.com/*",

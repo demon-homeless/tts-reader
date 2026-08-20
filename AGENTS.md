@@ -24,10 +24,9 @@ src/
     l10n.ts             # Runtime i18n for VSCode (loads package.nls*.json)
   chrome/
     manifest.json       # MV3 manifest (icons live in icons/, not committed here)
-    background.js       # Service worker: session state, synthesis, popup messaging
-    content.js          # Content script: extracts page/selection text
-    popup.html/js       # Popup UI: status + settings; hosts audio playback
-    popupPlayer.js      # <audio> playback in the popup (generation-guarded)
+    background.js       # Service worker: session state, synthesis, tab messaging
+    content.js          # Content script: text extraction + in-page <audio> playback
+    popup.html/js       # Popup UI: status + settings only (no audio)
     options.html/js     # Full options page
     ttsEngine.js        # TTS providers (browser JS)
     segmenter.js        # Segmenter ported for the browser (plain JS)
@@ -71,14 +70,16 @@ They implement the same `synthesizeSegment(text, opts) → audio` contract but u
 
 **If you change segmentation logic, update both** and keep the behavior identical.
 
-### 3. Chrome playback lives in the popup, not an offscreen document
-This is a **deliberate, hard-won decision** (see comments in `background.js` and `popupPlayer.js`). Offscreen documents are throttled by Chrome (timers clamped to 1 min, AudioContext can't resume without a user gesture), which broke background playback. The popup is a normal extension page with full audio capability.
-- Do NOT move playback to an offscreen document.
-- The popup is opened via `chrome.action.openPopup()` on a user gesture.
-- A heartbeat (3s ping) detects popup closure and stops the session.
+### 3. Chrome playback lives in the content script (in-page <audio>)
+Audio playback happens in a hidden `<audio>` element created by the content script in the user's active tab. The popup is a pure status/settings panel.
+- The background sends base64-encoded MP3 segments to the content script via `chrome.tabs.sendMessage(tabId, ...)`. The content script decodes them into a Blob, creates an object URL, and plays via `<audio>`.
+- A heartbeat (3s `ttsPing`) detects if the tab was closed or navigated; on failure the session is stopped.
+- The `<audio>` element is created lazily on first play and torn down on stop. `pagehide` also triggers teardown.
+- All `chrome.tabs.sendMessage` calls are wrapped with a 5s timeout to prevent the service worker from hanging.
+- Do NOT move playback to an offscreen document (`chrome.offscreen` API can block the SW event loop) or to a background tab (intrusive, may be throttled).
 
 ### 4. Session generation counter
-Both the Chrome background and the popup use a **monotonically increasing generation counter** to drop stale messages. Every `stop`/`skip`/`start` bumps it. The popup drops `play` messages whose generation doesn't match. **Preserve this mechanism** when touching session lifecycle.
+Both the Chrome background and the content script use a **monotonically increasing generation counter** to drop stale messages. Every `stop`/`skip`/`start` bumps it. The content script drops `play` messages whose generation is **older** than the current one (newer generations are accepted as new sessions). **Preserve this mechanism** when touching session lifecycle.
 
 ### 5. Edge TTS specifics (fragile, protocol-dependent)
 - **VSCode (Node):** tries Python `edge-tts` package first, falls back to a hand-rolled WebSocket client (`MiniWebSocket` in `ttsEngine.ts`). The WS handshake needs `TrustedClientToken`, `Sec-MS-GEC` (SHA-256 of a 5-min-window tick + token), and a Chromium `User-Agent`.
@@ -112,7 +113,7 @@ Setting keys were renamed from `edgeTts.*` to `ttsReader.*` in v0.1.0. **Do not 
 
 - Don't add a test framework or CI — none exists and isn't requested.
 - Don't refactor the Chrome extension to use ES modules — MV3 service workers here use `importScripts`.
-- Don't remove the 8-second Edge TTS token delay, the generation counter, or the popup-based playback.
+- Don't remove the 8-second Edge TTS token delay or the generation counter.
 - Don't commit `out/`, `node_modules/`, `*.vsix`, or `package-lock.json` (all gitignored).
 - Don't change the `publisher` field in `package.json` (currently `local`) without being asked.
 - Don't add secrets, API keys, or tokens to the repo. The `TrustedClientToken` is a public constant, not a secret.

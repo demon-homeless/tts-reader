@@ -78,6 +78,8 @@ const $providerDesc = document.getElementById("providerDesc");
 const $apiKeyRow = document.getElementById("apiKeyRow");
 const $apiUrlRow = document.getElementById("apiUrlRow");
 const $modelRow = document.getElementById("modelRow");
+const $proxyUrl = document.getElementById("proxyUrl");
+const $trustedClientToken = document.getElementById("trustedClientToken");
 
 function updateProviderUI() {
   const i18n = self.i18n;
@@ -126,6 +128,7 @@ async function loadSettings() {
     apiKey: "",
     model: "",
     trustedClientToken: "",
+    proxyUrl: "",
   });
 
   $provider.value = settings.provider;
@@ -140,6 +143,8 @@ async function loadSettings() {
   $maxChars.value = settings.maxSegmentChars;
   $minChars.value = settings.minSegmentChars;
   $preload.value = settings.preloadSegments;
+  $proxyUrl.value = settings.proxyUrl || "";
+  $trustedClientToken.value = settings.trustedClientToken || "";
 
   updateProviderUI();
   populateVoices(settings.provider, settings.voice);
@@ -169,6 +174,9 @@ async function saveSettings() {
   if (provider === "openai") {
     updates.model = $model.value;
   }
+
+  updates.proxyUrl = $proxyUrl.value.trim();
+  updates.trustedClientToken = $trustedClientToken.value.trim();
 
   await chrome.storage.sync.set(updates);
 

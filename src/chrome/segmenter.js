@@ -13,7 +13,7 @@
  *   4. Paragraph mode: split on blank lines first, then sentence-split inside.
  */
 
-const CJK_TERMINALS = new Set(["。", "！", "？", "；", "…"]);
+const CJK_TERMINALS = new Set(["，", "。", "！", "？", "；", "…"]);
 const LATIN_TERMINALS = new Set([".", "!", "?", ";", ":"]);
 
 const ABBREVIATIONS = new Set([

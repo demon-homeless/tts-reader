@@ -6,19 +6,17 @@
  *   2. Extracts text from the active tab via content script.
  *   3. Segments the text.
  *   4. Synthesizes segments using the configured TTS provider.
- *   5. Sends audio to the popup page for playback.
+ *   5. Sends audio to the content script in the active tab for playback.
  *
- * Audio playback happens in the extension's POPUP page (popup.html),
- * not in an offscreen document. Offscreen documents are aggressively
- * throttled by Chrome (timers clamped to 1 minute, no user gesture,
- * AudioContext cannot be resumed without interaction), which caused
- * the "background playback keeps breaking" bug. The popup page is a
- * normal extension page with full audio playback capability.
+ * Audio playback happens in the CONTENT SCRIPT (injected <audio> element
+ * in the user's active tab). This avoids:
+ *   - Popup: closes on focus loss, requires user gesture to open
+ *   - Offscreen document: chrome.offscreen API can block the SW event loop
+ *   - Background tab: extra tab is intrusive, may be throttled
  *
- * The popup is opened automatically when a reading session starts, via
- * chrome.action.openPopup() (Chrome 120+, works when triggered by a user
- * gesture such as a context-menu click). If the user closes the popup,
- * playback stops and the session is cleaned up.
+ * The content script creates a hidden <audio> element and plays segments
+ * as they arrive. If the user navigates away, the audio stops and the
+ * background detects this via heartbeat and cleans up.
  *
  * User controls playback via right-click context menu:
  *   "Read Page" / "Read Selection" / "Pause" / "Resume" / "Skip" / "Stop"
@@ -39,6 +37,7 @@ let currentSession = null;
  *   audioBuffers: Map<number, string>,  // cached audio (base64)
  *   inFlight: Map<number, Promise>,
  *   sourceLabel: string,
+ *   tabId: number,          // tab where playback is happening
  * }
  */
 
@@ -46,17 +45,15 @@ let currentSession = null;
  * Monotonically increasing generation counter. Bumped on every stop /
  * start so that:
  *   - queued "play" messages from an old session are dropped by the
- *     popup (it ignores play messages with an older generation than
- *     its last stop),
+ *     content script (it ignores play messages with an older generation),
  *   - stale "segmentEnded" / "playError" messages are ignored here.
  */
 let sessionGeneration = 0;
 
 /**
  * Heartbeat timer. While a session is active, the background pings the
- * popup every 3s. If the ping fails (popup was closed by the user),
- * the session is stopped. Without this, the session state stays
- * "playing" forever even though the audio is gone.
+ * content script every 3s. If the ping fails (tab was closed or navigated),
+ * the session is stopped.
  */
 let heartbeatTimer = null;
 
@@ -77,6 +74,7 @@ const DEFAULT_SETTINGS = {
   apiKey: "",
   model: "",
   trustedClientToken: "",
+  proxyUrl: "",
 };
 
 async function getSettings() {
@@ -84,120 +82,66 @@ async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...stored };
 }
 
-// ─── Popup document management ──────────────────────────────────────────────
+// ─── Content script messaging ───────────────────────────────────────────────
 //
-// Audio playback happens in the extension's POPUP page (popup.html), not
-// in an offscreen document. This is deliberate: offscreen documents are
-// aggressively throttled by Chrome (timers clamped to 1 minute, no user
-// gesture, AudioContext cannot be resumed without interaction), which
-// caused the "background playback keeps breaking" bug. The popup page is
-// a normal extension page: it has full audio playback capability and is
-// not throttled while open.
-//
-// The popup is opened automatically when a reading session starts, via
-// chrome.action.openPopup() (Chrome 120+, works when triggered by a user
-// gesture such as a context-menu click). If the user closes the popup,
-// playback stops and the session is cleaned up.
+// Audio playback happens in the content script's <audio> element.
+// All messages are sent to a specific tab via chrome.tabs.sendMessage.
+// Every send is wrapped with a timeout to prevent the service worker
+// from hanging if the tab becomes unresponsive.
 
-let popupReady = false;
+/** Timeout for a single chrome.tabs.sendMessage (ms). */
+const MSG_TIMEOUT = 5000;
 
 /**
- * Open the popup page so it can host audio playback.
- *
- * chrome.action.openPopup() only works when called from a user gesture
- * (context menu click, action click). It is a no-op otherwise. We call
- * it fire-and-forget: if it fails (e.g. called from a non-gesture
- * context), the user can open the popup manually.
+ * Send a message to the content script in a specific tab, with a timeout.
+ * Resolves with the response, or rejects on timeout / error.
  */
-async function ensurePopup() {
-  try {
-    await chrome.action.openPopup();
-    popupReady = true;
-  } catch (e) {
-    // openPopup failed — the popup may already be open, or the call was
-    // not from a user gesture. Ping to check if it's reachable.
-    console.warn("[background] openPopup failed:", e.message);
-    popupReady = await pingPopup(2000);
-  }
-}
-
-/**
- * Ping the popup to check if it's open and responsive.
- * Returns true if the popup responds to a ping within timeoutMs.
- */
-function pingPopup(timeoutMs) {
-  return new Promise((resolve) => {
-    const start = Date.now();
-    chrome.runtime.sendMessage({ type: "ping" }, (resp) => {
-      if (chrome.runtime.lastError) {
-        // No receiving end (popup closed) — keep polling briefly.
-        if (Date.now() - start > timeoutMs) {
-          resolve(false);
-        } else {
-          setTimeout(() => pingPopup(timeoutMs - (Date.now() - start)).then(resolve), 200);
-        }
-      } else if (resp && resp.ok) {
-        resolve(true);
-      } else {
-        if (Date.now() - start > timeoutMs) resolve(false);
-        else setTimeout(() => pingPopup(timeoutMs - (Date.now() - start)).then(resolve), 200);
+function sendToTab(tabId, msg, timeoutMs = MSG_TIMEOUT) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error("Tab message timed out"));
       }
-    });
+    }, timeoutMs);
+
+    try {
+      chrome.tabs.sendMessage(tabId, msg, (resp) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(resp);
+          }
+        }
+      });
+    } catch (e) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(e);
+      }
+    }
   });
 }
 
 /**
- * Send a message to the popup. Retries up to 3 times with increasing
- * delays if the popup is not ready.
+ * Ping the content script to check if it's alive and responsive.
  */
-async function sendToPopup(msg) {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(msg, (resp) => {
-          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-          else resolve(resp);
-        });
-      });
-      popupReady = true;
-      return;
-    } catch (e) {
-      if (e.message && e.message.includes("Receiving end does not exist")) {
-        const delay = 300 * (attempt + 1);
-        console.warn(`[background] Popup not ready, retrying in ${delay}ms (attempt ${attempt + 1})`);
-        await new Promise((r) => setTimeout(r, delay));
-        if (attempt === 1) {
-          await ensurePopup();
-        }
-      } else {
-        console.warn("[background] Popup message failed:", e.message);
-        return;
-      }
-    }
+async function pingTab(tabId, timeoutMs = 3000) {
+  try {
+    const resp = await sendToTab(tabId, { type: "ttsPing" }, timeoutMs);
+    return !!(resp && resp.ok);
+  } catch (e) {
+    return false;
   }
-  console.warn("[background] Popup message failed after 3 attempts");
-}
-
-/**
- * Close the popup (when idle). The popup detects its own close via
- * the "pagehide" event and cleans up its audio.
- */
-async function closePopup() {
-  stopHeartbeat();
-  popupReady = false;
-  // We cannot programmatically close the popup. The user closes it, or
-  // it closes when the browser window loses focus. We just stop the
-  // heartbeat and mark it as not ready.
 }
 
 // ─── Heartbeat ──────────────────────────────────────────────────────────────
 
-/**
- * Start the heartbeat: ping the popup every 3s while a session is active.
- * If the ping fails (popup was closed by the user), the session is
- * stopped — the user can restart reading by clicking the context menu
- * again.
- */
 function startHeartbeat() {
   stopHeartbeat();
   let consecutiveFailures = 0;
@@ -207,13 +151,13 @@ function startHeartbeat() {
       return;
     }
     try {
-      const ok = await pingPopup(2000);
+      const ok = await pingTab(currentSession.tabId, 2000);
       if (ok) {
         consecutiveFailures = 0;
       } else {
         consecutiveFailures++;
         if (consecutiveFailures >= 2) {
-          console.warn("[background] Popup closed — stopping session");
+          console.warn("[background] Tab gone — stopping session");
           consecutiveFailures = 0;
           await stopSession();
         }
@@ -221,7 +165,7 @@ function startHeartbeat() {
     } catch (e) {
       consecutiveFailures++;
       if (consecutiveFailures >= 2) {
-        console.warn(`[background] Heartbeat failed ${consecutiveFailures}x — popup is gone. Stopping.`);
+        console.warn(`[background] Heartbeat failed ${consecutiveFailures}x — stopping.`);
         consecutiveFailures = 0;
         await stopSession();
       }
@@ -238,9 +182,6 @@ function stopHeartbeat() {
 
 // ─── Synthesis ──────────────────────────────────────────────────────────────
 
-/**
- * Synthesize a single segment and return the audio as a base64 string.
- */
 async function synthesizeSegmentBase64(text, ttsOpts) {
   const audio = await synthesizeSegment(text, ttsOpts);
   const bytes = new Uint8Array(audio);
@@ -258,7 +199,7 @@ async function synthesizeSegmentBase64(text, ttsOpts) {
 /**
  * Start a new reading session.
  */
-async function startReading(text, sourceLabel) {
+async function startReading(text, sourceLabel, tabId) {
   if (!text || !text.trim()) {
     return { error: "No text to read" };
   }
@@ -267,6 +208,21 @@ async function startReading(text, sourceLabel) {
   await stopSession();
 
   const settings = await getSettings();
+
+  // Determine the target tab. If not provided, use the active tab.
+  if (!tabId) {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) {
+      return { error: "No active tab found" };
+    }
+    tabId = tab.id;
+  }
+
+  // Verify the content script is alive in the target tab
+  const alive = await pingTab(tabId, 3000);
+  if (!alive) {
+    return { error: "Content script not available in this tab. Try reloading the page." };
+  }
 
   // Segment the text
   const segments = segmentText(text, {
@@ -290,6 +246,7 @@ async function startReading(text, sourceLabel) {
     apiKey: settings.apiKey || undefined,
     model: settings.model || undefined,
     trustedClientToken: settings.trustedClientToken || undefined,
+    proxyUrl: settings.proxyUrl || undefined,
   };
 
   // Create session
@@ -302,11 +259,11 @@ async function startReading(text, sourceLabel) {
     audioBuffers: new Map(),
     inFlight: new Map(),
     sourceLabel,
+    tabId,
     generation: sessionGeneration,
   };
 
-  // Synthesize first segment (before the popup opens, so a synthesis
-  // failure does not leave a popup open with nothing to play)
+  // Synthesize first segment
   let firstAudio;
   try {
     firstAudio = await synthesizeSegmentBase64(segments[0].text, ttsOpts);
@@ -316,8 +273,6 @@ async function startReading(text, sourceLabel) {
     return { error: `Synthesis failed: ${err.message}` };
   }
 
-  // Ensure the popup is open and ready (it hosts audio playback).
-  await ensurePopup();
   currentSession.audioBuffers.set(0, firstAudio);
 
   try {
@@ -325,15 +280,13 @@ async function startReading(text, sourceLabel) {
 
     // Apply the client-side playback speed multiplier
     if (settings.playbackRate && settings.playbackRate !== 1.0) {
-      await sendToPopup({ type: "setRate", rate: settings.playbackRate });
+      await sendToTab(tabId, { type: "ttsSetRate", rate: settings.playbackRate });
     }
 
-    // Start playback. The popup plays segments strictly in
-    // order; the background reports segmentEnded for each one.
+    // Start playback
     await playSegment(0);
 
-    // Start the heartbeat to detect if the user closes the popup
-    // while the session is active.
+    // Start the heartbeat to detect if the tab is closed/navigated
     startHeartbeat();
 
     updateBadge();
@@ -350,30 +303,20 @@ async function startReading(text, sourceLabel) {
     currentSession = null;
     stopHeartbeat();
     updateBadge();
-    return { error: `Synthesis failed: ${err.message}` };
+    return { error: `Playback failed: ${err.message}` };
   }
 }
 
 /**
  * Play a segment: resolve its audio (cache → in-flight → fresh
- * synthesis), send it to the popup. The popup plays segments strictly
- * in order, so the next segment is only sent after the current one
- * ends (via the segmentEnded handler).
- *
- * Called from:
- *   - startReading (first segment)
- *   - segmentEnded / playError (next segment)
- *   - skipSegment (skipped-to segment)
- *
- * The segment plays as soon as its own audio is ready — it never waits
- * for the buffer to fill.
+ * synthesis), send it to the content script.
  */
 async function playSegment(index) {
   const session = currentSession;
   if (!session || index >= session.segments.length) {
     return;
   }
-  const { segments, ttsOpts, audioBuffers, inFlight } = session;
+  const { segments, ttsOpts, audioBuffers, inFlight, tabId } = session;
   const total = segments.length;
 
   let audio;
@@ -401,7 +344,6 @@ async function playSegment(index) {
     }
   } catch (err) {
     console.warn(`[background] Synthesis failed for segment ${index + 1}: ${err.message}`);
-    // Skip the bad segment and continue with the next one.
     if (currentSession === session) {
       session.currentIndex++;
       if (session.currentIndex < total) {
@@ -411,24 +353,26 @@ async function playSegment(index) {
     return;
   }
 
-  // A session that ended (or was skipped) while we were resolving this
-  // segment must not send a stale "play" message. The generation check
-  // catches both stopSession and skipSegment (which bump the generation).
+  // Generation check: drop stale segments
   if (currentSession !== session || session.generation !== sessionGeneration) {
     return;
   }
 
-  // Send the segment to the popup.
-  await sendToPopup({
-    type: "play",
-    audio,
-    index,
-    total,
-    generation: session.generation,
-  });
+  // Send the segment to the content script.
+  try {
+    await sendToTab(tabId, {
+      type: "ttsPlay",
+      audio,
+      index,
+      total,
+      generation: session.generation,
+    });
+  } catch (e) {
+    console.warn(`[background] Failed to send segment ${index + 1}: ${e.message}`);
+    return;
+  }
 
-  // Look-ahead: start synthesizing the next segment in the background
-  // so it's ready when the current one ends (no gap between segments).
+  // Look-ahead: start synthesizing the next segment
   const nextIndex = index + 1;
   if (nextIndex < total && !audioBuffers.has(nextIndex) && !inFlight.has(nextIndex)) {
     void synthesizeAndCache(nextIndex, session);
@@ -436,8 +380,7 @@ async function playSegment(index) {
 }
 
 /**
- * Synthesize a segment and cache its audio. Called as a look-ahead from
- * playSegment so the next segment is ready when the current one ends.
+ * Synthesize a segment and cache its audio (look-ahead).
  */
 async function synthesizeAndCache(index, session) {
   if (currentSession !== session) return;
@@ -452,7 +395,7 @@ async function synthesizeAndCache(index, session) {
         session.inFlight.delete(index);
       }
     })
-    .catch((err) => {
+    .catch(() => {
       if (currentSession === session) {
         session.inFlight.delete(index);
       }
@@ -462,10 +405,6 @@ async function synthesizeAndCache(index, session) {
 
 /**
  * Skip to the next segment.
- *
- * Bumping the session generation invalidates every "play" message that
- * was queued for the current segment (the popup drops them),
- * so the skip is clean: only the new segment and its buffer play.
  */
 async function skipSegment() {
   if (!currentSession) return { error: "No active session" };
@@ -479,11 +418,14 @@ async function skipSegment() {
   sessionGeneration++;
   session.generation = sessionGeneration;
 
-  // Drop the current segment and any queued segments of the old session
-  await sendToPopup({ type: "stop", generation: session.generation });
+  // Drop the current segment
+  try {
+    await sendToTab(session.tabId, { type: "ttsStop", generation: session.generation });
+  } catch (e) {
+    console.warn("[background] skipSegment stop failed:", e.message);
+  }
 
   if (!wasLast && currentSession === session) {
-    // Start the new segment (and its buffer)
     void playSegment(session.currentIndex);
   }
   updateBadge();
@@ -497,22 +439,29 @@ async function skipSegment() {
 
 /**
  * Stop the current session.
- *
- * Bumping the session generation invalidates every queued "play" message
- * (the popup drops them) and every in-flight preload result
- * (preloadSegment only caches into the active session).
  */
 async function stopSession() {
+  const hadSession = !!currentSession;
   if (currentSession) {
     currentSession.status = "stopped";
     sessionGeneration++;
     currentSession.generation = sessionGeneration;
+    const tabId = currentSession.tabId;
     currentSession = null;
+
+    stopHeartbeat();
+
+    // Tell the content script to stop playback
+    try {
+      await sendToTab(tabId, { type: "ttsStop", generation: sessionGeneration });
+    } catch (e) {
+      // Tab may already be gone — ignore.
+    }
+  } else {
+    stopHeartbeat();
   }
-  stopHeartbeat();
-  await sendToPopup({ type: "stop", generation: sessionGeneration });
+
   updateBadge();
-  setTimeout(closePopup, 2000);
   return { ok: true };
 }
 
@@ -522,7 +471,11 @@ async function stopSession() {
 async function pausePlayback() {
   if (currentSession && currentSession.status === "playing") {
     currentSession.status = "paused";
-    await sendToPopup({ type: "pause" });
+    try {
+      await sendToTab(currentSession.tabId, { type: "ttsPause" });
+    } catch (e) {
+      console.warn("[background] pause failed:", e.message);
+    }
     updateBadge();
     return { ok: true };
   }
@@ -535,7 +488,11 @@ async function pausePlayback() {
 async function resumePlayback() {
   if (currentSession && currentSession.status === "paused") {
     currentSession.status = "playing";
-    await sendToPopup({ type: "resume" });
+    try {
+      await sendToTab(currentSession.tabId, { type: "ttsResume" });
+    } catch (e) {
+      console.warn("[background] resume failed:", e.message);
+    }
     updateBadge();
     return { ok: true };
   }
@@ -629,16 +586,14 @@ function createContextMenu() {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   switch (info.menuItemId) {
     case "tts-read-page": {
-      // Extract full page text
       try {
         const response = await chrome.tabs.sendMessage(tab.id, { type: "extractPage" });
         if (response && response.text) {
-          startReading(response.text, "Page").then((r) => r && r.error && console.warn("[background]", r.error));
+          startReading(response.text, "Page", tab.id).then((r) => r && r.error && console.warn("[background]", r.error));
         } else {
-          // Fallback: try selection
           const sel = await chrome.tabs.sendMessage(tab.id, { type: "extractSelection" });
           if (sel && sel.text) {
-            startReading(sel.text, "Selection").then((r) => r && r.error && console.warn("[background]", r.error));
+            startReading(sel.text, "Selection", tab.id).then((r) => r && r.error && console.warn("[background]", r.error));
           }
         }
       } catch {
@@ -648,7 +603,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
     case "tts-read-selection": {
       if (info.selectionText) {
-        startReading(info.selectionText, "Selection").then((r) => r && r.error && console.warn("[background]", r.error));
+        startReading(info.selectionText, "Selection", tab.id).then((r) => r && r.error && console.warn("[background]", r.error));
       }
       break;
     }
@@ -672,7 +627,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.type) {
     case "startReading": {
-      startReading(message.text, message.sourceLabel || "page").then(sendResponse);
+      // tabId comes from the sender (content script) or the message
+      const tabId = message.tabId || (sender.tab && sender.tab.id);
+      startReading(message.text, message.sourceLabel || "page", tabId).then(sendResponse);
       return true;
     }
     case "skipSegment":
@@ -694,7 +651,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       getSettings().then(sendResponse);
       return true;
     case "segmentEnded": {
-      // From the popup: a segment finished playing.
+      // From the content script: a segment finished playing.
       if (
         currentSession &&
         message.index === currentSession.currentIndex &&
@@ -707,9 +664,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           currentSession = null;
           stopHeartbeat();
           updateBadge();
-          setTimeout(closePopup, 2000);
         } else {
-          // Queue the next segment
           void playSegment(currentSession.currentIndex);
         }
       }
@@ -717,7 +672,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
     }
     case "playError": {
-      // A segment failed to play in the popup.
       console.warn("[background] Playback error:", message.error);
       if (
         currentSession &&
@@ -742,8 +696,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 createContextMenu();
 chrome.action.setBadgeText({ text: "" });
 
-// Surface unhandled promise rejections instead of swallowing them
-// (e.g. a failed chrome.storage call must not crash the worker silently).
 self.addEventListener("unhandledrejection", (event) => {
   console.error("[background] Unhandled promise rejection:", event.reason);
 });

@@ -109,6 +109,10 @@ async function synthesizeEdgeTts(text, opts) {
   // volume, pitch }. The local proxy (tools/edge-tts-proxy.js) accepts
   // GET with query params (?text=...&voice=...). Try remote first, then
   // local, then direct WS.
+  //
+  // opts.proxyUrl (user-configurable, same key as the VSCode extension's
+  // ttsReader.proxyUrl) forces a single custom proxy endpoint (POST JSON)
+  // and disables the built-in candidates.
   const voice = opts.voice || "en-US-AvaMultilingualNeural";
   const proxyCandidates = opts.proxyUrl
     ? [{ url: opts.proxyUrl, method: "POST" }]
@@ -117,6 +121,7 @@ async function synthesizeEdgeTts(text, opts) {
         { url: EDGE_TTS_PROXY_LOCAL, method: "GET" },
       ];
 
+  const proxyErrors = [];
   for (const { url: proxyUrl, method } of proxyCandidates) {
     try {
       let fetchUrl = proxyUrl;
@@ -149,10 +154,20 @@ async function synthesizeEdgeTts(text, opts) {
       const body = await resp.text();
       throw new Error(`proxy error ${resp.status}: ${body.slice(0, 200)}`);
     } catch (e) {
-      log(`proxy ${method} ${proxyUrl} failed: ${e.message}, trying next...`);
+      const msg = `proxy ${method} ${proxyUrl} failed: ${e.message}`;
+      log(`${msg}, trying next...`);
+      proxyErrors.push(msg);
     }
   }
   log(`all proxies failed, falling back to direct WS`);
+  // Attach the proxy failures so the caller can surface WHY there is no
+  // audio (the direct-WS fallback never works in a browser — it cannot
+  // send the User-Agent header the Edge endpoint requires).
+  const noAudioError = (msg) => {
+    const err = new Error(msg);
+    err.proxyErrors = proxyErrors;
+    return err;
+  };
 
   // 2. Fallback: direct WebSocket (works in Node.js, not in Chrome)
   const token = await generateSecMsGec();
@@ -181,7 +196,7 @@ async function synthesizeEdgeTts(text, opts) {
       clearTimeout(timeout);
       log(`FAIL: ${msg} (after ${Date.now() - t0}ms, open=${gotOpen}, chunks=${audioChunks.length})`);
       try { ws.close(); } catch { /* ignore */ }
-      reject(new Error(msg));
+      reject(noAudioError(msg));
     };
 
     const timeout = setTimeout(() => {
